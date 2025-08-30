@@ -51,6 +51,15 @@ export const DrawingTool = ({
   const handleMouseDown = useCallback((event: MouseEvent) => {
     if (mode === 'none') return;
 
+    // Prevent default behavior and stop propagation
+    event.preventDefault();
+    event.stopPropagation();
+
+    // Disable camera controls immediately for any drawing mode
+    if (controls && 'enabled' in controls) {
+      (controls as any).enabled = false;
+    }
+
     // Calculate mouse position
     const canvas = event.target as HTMLCanvasElement;
     const rect = canvas.getBoundingClientRect();
@@ -101,14 +110,14 @@ export const DrawingTool = ({
         scene.add(marker);
         
         console.log(`${nipple.id} nipple placed at:`, point);
+        
+        // Re-enable controls after nipple placement
+        if (controls && 'enabled' in controls) {
+          (controls as any).enabled = true;
+        }
       } else if (mode === 'leftContour' || mode === 'rightContour') {
         // Start drawing contour
         setIsDrawing(true);
-        
-        // Disable camera controls while drawing
-        if (controls && 'enabled' in controls) {
-          (controls as any).enabled = false;
-        }
         
         // Clear any existing path
         clearCurrentDrawing();
