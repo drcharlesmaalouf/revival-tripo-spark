@@ -18,7 +18,7 @@ export const AnatomicalMarkers = ({ landmarks, showMarkers = true }: AnatomicalM
     label: string;
   }) => (
     <mesh position={[position.x, position.y, position.z]}>
-      <sphereGeometry args={[0.01, 8, 8]} />
+      <sphereGeometry args={[0.1, 16, 16]} />
       <meshBasicMaterial color={color} />
     </mesh>
   );
