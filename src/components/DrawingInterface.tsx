@@ -18,8 +18,10 @@ interface DrawingInterfaceProps {
   scene: THREE.Group | null;
   onMeasurementsComplete: (measurements: CalculatedMeasurements) => void;
   onModeChange: (mode: 'leftContour' | 'rightContour' | 'leftNipple' | 'rightNipple' | 'none') => void;
-  onContourComplete?: (contour: BreastContour) => void;
-  onNipplePlaced?: (nipple: NippleMarker) => void;
+  onGetHandlers?: (handlers: {
+    handleContourComplete: (contour: BreastContour) => void;
+    handleNipplePlaced: (nipple: NippleMarker) => void;
+  }) => void;
 }
 
 type DrawingMode = 'leftContour' | 'rightContour' | 'leftNipple' | 'rightNipple' | 'none';
@@ -28,8 +30,7 @@ export const DrawingInterface = ({
   scene, 
   onMeasurementsComplete,
   onModeChange,
-  onContourComplete,
-  onNipplePlaced 
+  onGetHandlers
 }: DrawingInterfaceProps) => {
   const [currentMode, setCurrentMode] = useState<DrawingMode>('none');
   const [annotations, setAnnotations] = useState<ManualMeasurements>({
@@ -93,16 +94,15 @@ export const DrawingInterface = ({
       [contour.id === 'left' ? 'leftContour' : 'rightContour']: contour
     }));
     
-    // Call parent handler
-    onContourComplete?.(contour);
-    
     // Auto-advance to next mode
     if (contour.id === 'left') {
       setCurrentMode('rightContour');
     } else {
       setCurrentMode('leftNipple');
     }
-  }, [onContourComplete]);
+    
+    console.log(`${contour.id} contour completed, advancing to next mode`);
+  }, []);
 
   const handleNipplePlaced = useCallback((nipple: NippleMarker) => {
     setAnnotations(prev => ({
@@ -110,16 +110,25 @@ export const DrawingInterface = ({
       [nipple.id === 'left' ? 'leftNipple' : 'rightNipple']: nipple
     }));
 
-    // Call parent handler
-    onNipplePlaced?.(nipple);
-
     // Auto-advance to next mode
     if (nipple.id === 'left') {
       setCurrentMode('rightNipple');
     } else {
       setCurrentMode('none');
     }
-  }, [onNipplePlaced]);
+    
+    console.log(`${nipple.id} nipple placed, advancing to next mode`);
+  }, []);
+
+  // Export handlers to parent
+  useEffect(() => {
+    if (onGetHandlers) {
+      onGetHandlers({
+        handleContourComplete,
+        handleNipplePlaced
+      });
+    }
+  }, [handleContourComplete, handleNipplePlaced, onGetHandlers]);
 
   const handleDistanceSubmit = useCallback(() => {
     const distance = parseFloat(nippleDistance);

@@ -26,9 +26,11 @@ export const DrawingTool = ({
   const [currentPath, setCurrentPath] = useState<DrawnPath>({ points: [], line: null });
   const mouseRef = useRef(new THREE.Vector2());
 
-  // Clear any existing drawings when mode changes
+  // Clear current drawing only when switching between different contour modes
   useEffect(() => {
-    clearCurrentDrawing();
+    if (mode === 'none' || mode === 'leftNipple' || mode === 'rightNipple') {
+      clearCurrentDrawing();
+    }
   }, [mode]);
 
   const clearCurrentDrawing = useCallback(() => {
