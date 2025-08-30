@@ -44,7 +44,26 @@ const GeneratedModel = memo(({
     ? `https://jdjdwysfkjqgfdidcmnh.supabase.co/functions/v1/proxy-model?url=${encodeURIComponent(modelUrl)}`
     : modelUrl;
 
-  console.log('Loading model:', { original: modelUrl, final: finalUrl, useProxy: shouldUseProxy });
+  console.log('=== MODEL URL DEBUG ===');
+  console.log('Original URL:', modelUrl);
+  console.log('Final URL:', finalUrl);
+  console.log('Using proxy:', shouldUseProxy);
+  
+  // Test if the model URL is accessible
+  if (shouldUseProxy) {
+    fetch(finalUrl)
+      .then(response => {
+        console.log('Model fetch response:', response.status, response.statusText);
+        console.log('Content-Type:', response.headers.get('content-type'));
+        console.log('Content-Length:', response.headers.get('content-length'));
+        return response.blob();
+      })
+      .then(blob => {
+        console.log('Model blob size:', blob.size, 'bytes');
+        console.log('Model blob type:', blob.type);
+      })
+      .catch(err => console.error('Model fetch failed:', err));
+  }
 
   const gltfResult = useGLTF(finalUrl);
 
