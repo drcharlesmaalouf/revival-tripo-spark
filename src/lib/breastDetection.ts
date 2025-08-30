@@ -271,31 +271,35 @@ export class BreastDetector {
     // Create nipple markers
     if (landmarks.leftNipple) {
       const leftMarker = new THREE.Mesh(
-        new THREE.SphereGeometry(0.02, 16, 16),
+        new THREE.SphereGeometry(0.1, 16, 16), // Much larger sphere
         new THREE.MeshStandardMaterial({ 
           color: 0xff1493, // Deep pink
-          emissive: 0x441144,
-          transparent: true,
-          opacity: 0.8
+          emissive: 0xff1493, // Bright emissive
+          emissiveIntensity: 0.5,
+          transparent: false, // Make solid for visibility
+          opacity: 1.0
         })
       );
       leftMarker.position.copy(landmarks.leftNipple);
       leftMarker.name = 'LeftNipple';
+      console.log('Created left nipple marker at:', landmarks.leftNipple);
       markersGroup.add(leftMarker);
     }
 
     if (landmarks.rightNipple) {
       const rightMarker = new THREE.Mesh(
-        new THREE.SphereGeometry(0.02, 16, 16),
+        new THREE.SphereGeometry(0.1, 16, 16), // Much larger sphere
         new THREE.MeshStandardMaterial({ 
           color: 0x1e90ff, // Deep sky blue
-          emissive: 0x114444,
-          transparent: true,
-          opacity: 0.8
+          emissive: 0x1e90ff, // Bright emissive
+          emissiveIntensity: 0.5,
+          transparent: false, // Make solid for visibility
+          opacity: 1.0
         })
       );
       rightMarker.position.copy(landmarks.rightNipple);
       rightMarker.name = 'RightNipple';
+      console.log('Created right nipple marker at:', landmarks.rightNipple);
       markersGroup.add(rightMarker);
     }
 
@@ -333,11 +337,13 @@ export class BreastDetector {
       
       const vertex = region.vertices[i];
       const marker = new THREE.Mesh(
-        new THREE.SphereGeometry(0.008, 8, 8),
+        new THREE.SphereGeometry(0.05, 8, 8), // Larger region markers
         new THREE.MeshStandardMaterial({ 
           color: color,
-          transparent: true,
-          opacity: 0.6
+          emissive: color,
+          emissiveIntensity: 0.3,
+          transparent: false,
+          opacity: 1.0
         })
       );
       marker.position.copy(vertex.position);
