@@ -119,7 +119,7 @@ const GeneratedModel = ({
     <group ref={groupRef}>
       <primitive
         object={gltfResult.scene.clone()}
-        scale={[1, 1, 1]}
+        scale={[10, 10, 10]}
         position={[0, 0, 0]}
       />
       {isAnalyzing && (
@@ -343,9 +343,9 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
         <Canvas
           key={`main-viewer-${modelUrl}`}
           camera={{ 
-            position: [0.3, 0.2, 0.3], 
+            position: [3, 2, 3], 
             fov: 75,
-            near: 0.001,
+            near: 0.01,
             far: 1000
           }}
           style={{ background: "transparent" }}
