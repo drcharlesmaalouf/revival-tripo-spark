@@ -84,7 +84,11 @@ const GeneratedModel = ({
 
   // Check if the model has loaded successfully
   if (!gltfResult?.scene) {
-    console.log('No GLTF scene found - showing green cube fallback');
+    console.log('No GLTF scene found - showing green cube fallback', {
+      gltfResult,
+      modelUrl: finalUrl,
+      isBlob: modelUrl.startsWith('blob:')
+    });
     return (
       <Box args={[1.5, 1.5, 1.5]}>
         <meshStandardMaterial
@@ -96,7 +100,7 @@ const GeneratedModel = ({
     );
   }
 
-  console.log('Model loaded successfully:', gltfResult);
+  console.log('Model loaded successfully:', gltfResult, 'Original URL:', modelUrl);
 
   return (
     <group ref={groupRef}>
@@ -325,6 +329,26 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
         <Canvas
           camera={{ position: [4, 4, 4], fov: 50 }}
           style={{ background: "transparent" }}
+          onCreated={({ gl }) => {
+            // Handle WebGL context loss
+            gl.domElement.addEventListener('webglcontextlost', (event) => {
+              console.warn('WebGL context lost, preventing default and attempting recovery');
+              event.preventDefault();
+              toast({
+                title: "Display Issue",
+                description: "3D viewer context lost. Refreshing...",
+                variant: "destructive"
+              });
+            });
+            
+            gl.domElement.addEventListener('webglcontextrestored', () => {
+              console.log('WebGL context restored');
+              toast({
+                title: "Display Restored",
+                description: "3D viewer is working again.",
+              });
+            });
+          }}
         >
           <Suspense fallback={null}>
             <Scene 
@@ -460,6 +484,13 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
               <Canvas
                 camera={{ position: [4, 4, 4], fov: 50 }}
                 style={{ background: "transparent" }}
+                onCreated={({ gl }) => {
+                  // Handle WebGL context loss for fullscreen viewer too
+                  gl.domElement.addEventListener('webglcontextlost', (event) => {
+                    console.warn('WebGL context lost in fullscreen viewer');
+                    event.preventDefault();
+                  });
+                }}
               >
                 <Suspense fallback={null}>
                   <Scene 
