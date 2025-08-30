@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { useThree } from '@react-three/fiber';
+import { useThree, useFrame } from '@react-three/fiber';
 import { BreastContour, NippleMarker } from '@/lib/manualMeasurements';
 
 interface InteractiveToolsProps {
@@ -9,18 +9,206 @@ interface InteractiveToolsProps {
   onNipplePlaced: (nipple: NippleMarker) => void;
 }
 
+interface ContourPoint {
+  position: THREE.Vector3;
+  mesh: THREE.Mesh;
+  isDragging: boolean;
+}
+
 export const InteractiveTools = ({ 
   mode, 
   onContourComplete,
   onNipplePlaced 
 }: InteractiveToolsProps) => {
-  const { camera, raycaster, scene } = useThree();
-  const [vertices, setVertices] = useState<THREE.Vector3[]>([]);
+  const { camera, raycaster, scene, gl } = useThree();
+  const [contourPoints, setContourPoints] = useState<ContourPoint[]>([]);
+  const [dragState, setDragState] = useState<{
+    isDragging: boolean;
+    pointIndex: number | null;
+    offset: THREE.Vector3;
+  }>({ isDragging: false, pointIndex: null, offset: new THREE.Vector3() });
+  
+  const contourGroupRef = useRef<THREE.Group>(null);
+  const mouseRef = useRef(new THREE.Vector2());
 
-  const handleClick = useCallback((event: MouseEvent) => {
-    if (mode === 'none') return;
+  // Create initial circle when entering contour mode
+  useEffect(() => {
+    if (mode === 'leftContour' || mode === 'rightContour') {
+      createInitialContour();
+    } else {
+      clearContour();
+    }
+  }, [mode]);
 
-    // Calculate mouse position in normalized device coordinates
+  const createInitialContour = useCallback(() => {
+    // Find the center of the 3D model to position the initial circle
+    const modelCenter = new THREE.Vector3(0, 0, 0);
+    const radius = 0.15; // Adjust based on your model scale
+    
+    // Create 5 points in a circle
+    const points: ContourPoint[] = [];
+    for (let i = 0; i < 5; i++) {
+      const angle = (i / 5) * Math.PI * 2;
+      const x = modelCenter.x + Math.cos(angle) * radius;
+      const y = modelCenter.y + Math.sin(angle) * radius * 0.7; // Slightly elliptical
+      const z = modelCenter.z + 0.1; // Slightly forward
+      
+      const position = new THREE.Vector3(x, y, z);
+      
+      // Create visible handle
+      const handleGeometry = new THREE.SphereGeometry(0.02, 16, 16);
+      const handleMaterial = new THREE.MeshBasicMaterial({ 
+        color: mode === 'leftContour' ? 0xff69b4 : 0x4169e1,
+        transparent: true,
+        opacity: 0.8
+      });
+      const handleMesh = new THREE.Mesh(handleGeometry, handleMaterial);
+      handleMesh.position.copy(position);
+      handleMesh.name = `contour-handle-${i}`;
+      
+      scene.add(handleMesh);
+      
+      points.push({
+        position: position.clone(),
+        mesh: handleMesh,
+        isDragging: false
+      });
+    }
+    
+    setContourPoints(points);
+    updateContourVisualization(points);
+  }, [mode, scene]);
+
+  const updateContourVisualization = useCallback((points: ContourPoint[]) => {
+    // Remove existing contour line
+    const existingLine = scene.getObjectByName('contour-line');
+    if (existingLine) {
+      scene.remove(existingLine);
+    }
+
+    if (points.length < 3) return;
+
+    // Create line connecting all points
+    const linePoints = [...points.map(p => p.position), points[0].position]; // Close the loop
+    const lineGeometry = new THREE.BufferGeometry().setFromPoints(linePoints);
+    const lineMaterial = new THREE.LineBasicMaterial({ 
+      color: mode === 'leftContour' ? 0xff69b4 : 0x4169e1,
+      linewidth: 3,
+      transparent: true,
+      opacity: 0.6
+    });
+    const line = new THREE.Line(lineGeometry, lineMaterial);
+    line.name = 'contour-line';
+    scene.add(line);
+  }, [scene, mode]);
+
+  const clearContour = useCallback(() => {
+    // Remove all handles and lines
+    contourPoints.forEach(point => {
+      scene.remove(point.mesh);
+    });
+    
+    const existingLine = scene.getObjectByName('contour-line');
+    if (existingLine) {
+      scene.remove(existingLine);
+    }
+    
+    setContourPoints([]);
+  }, [contourPoints, scene]);
+
+  const handleMouseDown = useCallback((event: MouseEvent) => {
+    if (mode !== 'leftContour' && mode !== 'rightContour') {
+      // Handle nipple placement
+      if (mode === 'leftNipple' || mode === 'rightNipple') {
+        handleNipplePlacement(event);
+      }
+      return;
+    }
+
+    // Calculate mouse position
+    const canvas = event.target as HTMLCanvasElement;
+    const rect = canvas.getBoundingClientRect();
+    mouseRef.current.set(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1
+    );
+
+    // Check if clicking on a handle
+    raycaster.setFromCamera(mouseRef.current, camera);
+    const handleMeshes = contourPoints.map(p => p.mesh);
+    const intersects = raycaster.intersectObjects(handleMeshes);
+
+    if (intersects.length > 0) {
+      const clickedMesh = intersects[0].object as THREE.Mesh;
+      const pointIndex = contourPoints.findIndex(p => p.mesh === clickedMesh);
+      
+      if (pointIndex !== -1) {
+        setDragState({
+          isDragging: true,
+          pointIndex,
+          offset: new THREE.Vector3()
+        });
+        
+        // Change handle appearance
+        (clickedMesh.material as THREE.MeshBasicMaterial).opacity = 1.0;
+      }
+    }
+  }, [mode, contourPoints, camera, raycaster]);
+
+  const handleMouseMove = useCallback((event: MouseEvent) => {
+    if (!dragState.isDragging || dragState.pointIndex === null) return;
+
+    const canvas = event.target as HTMLCanvasElement;
+    const rect = canvas.getBoundingClientRect();
+    mouseRef.current.set(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1
+    );
+
+    // Cast ray to find new position on the model
+    raycaster.setFromCamera(mouseRef.current, camera);
+    
+    // Find intersection with the 3D model
+    const meshes: THREE.Mesh[] = [];
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh && 
+          !child.name.includes('contour') && 
+          !child.name.includes('Nipple') &&
+          child.name !== 'BreastMarkers' && 
+          child.name !== 'ManualAnnotations') {
+        meshes.push(child);
+      }
+    });
+
+    const intersects = raycaster.intersectObjects(meshes);
+    
+    if (intersects.length > 0) {
+      const newPosition = intersects[0].point.clone();
+      
+      // Update the point position
+      setContourPoints(prev => {
+        const updated = [...prev];
+        updated[dragState.pointIndex!].position.copy(newPosition);
+        updated[dragState.pointIndex!].mesh.position.copy(newPosition);
+        return updated;
+      });
+      
+      // Update visualization in real-time
+      updateContourVisualization(contourPoints);
+    }
+  }, [dragState, camera, raycaster, scene, contourPoints, updateContourVisualization]);
+
+  const handleMouseUp = useCallback(() => {
+    if (dragState.isDragging && dragState.pointIndex !== null) {
+      // Reset handle appearance
+      const handle = contourPoints[dragState.pointIndex].mesh;
+      (handle.material as THREE.MeshBasicMaterial).opacity = 0.8;
+    }
+    
+    setDragState({ isDragging: false, pointIndex: null, offset: new THREE.Vector3() });
+  }, [dragState, contourPoints]);
+
+  const handleNipplePlacement = useCallback((event: MouseEvent) => {
     const canvas = event.target as HTMLCanvasElement;
     const rect = canvas.getBoundingClientRect();
     const mouse = new THREE.Vector2(
@@ -28,17 +216,15 @@ export const InteractiveTools = ({
       -((event.clientY - rect.top) / rect.height) * 2 + 1
     );
 
-    // Cast ray from camera
     raycaster.setFromCamera(mouse, camera);
     
-    // Find intersection with the 3D model
     const meshes: THREE.Mesh[] = [];
     scene.traverse((child) => {
       if (child instanceof THREE.Mesh && 
+          !child.name.includes('contour') && 
+          !child.name.includes('Nipple') &&
           child.name !== 'BreastMarkers' && 
-          child.name !== 'ManualAnnotations' &&
-          !child.name.includes('Contour') &&
-          !child.name.includes('Nipple')) {
+          child.name !== 'ManualAnnotations') {
         meshes.push(child);
       }
     });
@@ -48,34 +234,20 @@ export const InteractiveTools = ({
     if (intersects.length > 0) {
       const point = intersects[0].point.clone();
       
-      if (mode === 'leftContour' || mode === 'rightContour') {
-        // Contour mode
-        if (event.ctrlKey && vertices.length >= 3) {
-          // Ctrl+click to finish contour
-          finishContour();
-        } else {
-          // Add new vertex
-          setVertices(prev => [...prev, point]);
-        }
-      } else if (mode === 'leftNipple' || mode === 'rightNipple') {
-        // Nipple placement mode
-        const nipple: NippleMarker = {
-          position: point,
-          id: mode === 'leftNipple' ? 'left' : 'right'
-        };
-        onNipplePlaced(nipple);
-        console.log(`${nipple.id} nipple placed at:`, point);
-      }
+      const nipple: NippleMarker = {
+        position: point,
+        id: mode === 'leftNipple' ? 'left' : 'right'
+      };
+
+      onNipplePlaced(nipple);
     }
-  }, [mode, vertices, camera, raycaster, scene, onNipplePlaced]);
+  }, [mode, camera, raycaster, scene, onNipplePlaced]);
 
   const finishContour = useCallback(() => {
-    if (vertices.length < 3) {
-      console.warn('Need at least 3 vertices to create a contour');
-      return;
-    }
+    if (contourPoints.length < 3) return;
 
     const breastSide = mode === 'leftContour' ? 'left' : 'right';
+    const vertices = contourPoints.map(p => p.position.clone());
 
     // Calculate center and radius
     const center = new THREE.Vector3();
@@ -88,53 +260,35 @@ export const InteractiveTools = ({
 
     const contour: BreastContour = {
       id: breastSide,
-      vertices: [...vertices],
+      vertices,
       center,
       radius
     };
 
     onContourComplete(contour);
-    setVertices([]);
-  }, [vertices, mode, onContourComplete]);
+    clearContour();
+  }, [contourPoints, mode, onContourComplete, clearContour]);
 
-  // Reset vertices when mode changes
+  // Event listeners
   useEffect(() => {
-    if (mode === 'leftContour' || mode === 'rightContour') {
-      setVertices([]);
-    }
-  }, [mode]);
-
-  // Add event listeners
-  useEffect(() => {
-    if (mode === 'none') return;
-
-    const canvas = document.querySelector('canvas');
-    if (!canvas) return;
-
-    // Set cursor style based on mode
-    if (mode === 'leftNipple' || mode === 'rightNipple') {
-      canvas.style.cursor = 'crosshair';
-    } else {
-      canvas.style.cursor = 'pointer';
-    }
-
-    canvas.addEventListener('click', handleClick);
+    const canvas = gl.domElement;
+    
+    canvas.addEventListener('mousedown', handleMouseDown);
+    canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('mouseup', handleMouseUp);
     
     return () => {
-      canvas.style.cursor = 'default';
-      canvas.removeEventListener('click', handleClick);
+      canvas.removeEventListener('mousedown', handleMouseDown);
+      canvas.removeEventListener('mousemove', handleMouseMove);
+      canvas.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [mode, handleClick]);
+  }, [handleMouseDown, handleMouseMove, handleMouseUp, gl]);
 
   // Keyboard shortcuts
   useEffect(() => {
-    if (mode !== 'leftContour' && mode !== 'rightContour') return;
-
     const handleKeyPress = (event: KeyboardEvent) => {
-      if (event.key === 'Enter' && vertices.length >= 3) {
+      if ((mode === 'leftContour' || mode === 'rightContour') && event.key === 'Enter') {
         finishContour();
-      } else if (event.key === 'Escape') {
-        setVertices([]);
       }
     };
 
@@ -143,7 +297,7 @@ export const InteractiveTools = ({
     return () => {
       window.removeEventListener('keydown', handleKeyPress);
     };
-  }, [mode, vertices, finishContour]);
+  }, [mode, finishContour]);
 
-  return null; // This component doesn't render anything visible
+  return null;
 };

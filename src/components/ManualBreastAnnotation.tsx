@@ -183,9 +183,9 @@ export const ManualBreastAnnotation = ({
   const getStepInstructions = () => {
     switch (currentStep) {
       case 'leftContour':
-        return 'Click around the left breast to create a contour. Press Enter or Ctrl+Click to finish.';
+        return 'Drag the 5 control points to fit the left breast contour. Press Enter when finished.';
       case 'rightContour':
-        return 'Click around the right breast to create a contour. Press Enter or Ctrl+Click to finish.';
+        return 'Drag the 5 control points to fit the right breast contour. Press Enter when finished.';
       case 'leftNipple':
         return 'Click on the left nipple to place a marker.';
       case 'rightNipple':
