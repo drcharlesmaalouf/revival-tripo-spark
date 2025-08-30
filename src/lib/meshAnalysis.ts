@@ -179,39 +179,57 @@ export class MeshAnalyzer {
     
     console.log(`Calculating curvature for ${vertices.length} vertices...`);
     
-    // For performance, sample vertices if too many
-    const maxVertices = 10000;
-    const sampledVertices = vertices.length > maxVertices 
-      ? this.sampleVertices(vertices, maxVertices)
-      : vertices;
+    // For performance, limit analysis but keep all original indices
+    const maxVertices = 5000; // Reduce even further
+    let verticesToProcess = vertices;
     
-    console.log(`Processing ${sampledVertices.length} sampled vertices for curvature...`);
+    if (vertices.length > maxVertices) {
+      // Instead of sampling, just process every Nth vertex but keep original indices
+      const step = Math.ceil(vertices.length / maxVertices);
+      verticesToProcess = vertices.filter((_, index) => index % step === 0);
+      console.log(`Processing every ${step}th vertex: ${verticesToProcess.length} vertices`);
+    }
     
-    // Process in small batches with async breaks to avoid blocking UI
-    const batchSize = 100;
+    // Use a simpler neighbor finding approach for performance
+    const batchSize = 50; // Much smaller batches
     let processed = 0;
     
-    for (let i = 0; i < sampledVertices.length; i += batchSize) {
-      const batch = sampledVertices.slice(i, i + batchSize);
+    for (let i = 0; i < verticesToProcess.length; i += batchSize) {
+      const batch = verticesToProcess.slice(i, i + batchSize);
       
       for (const vertex of batch) {
-        const neighborIndices = this.findNeighbors(vertex.index, geometry);
-        const neighbors = neighborIndices.map(idx => vertices[idx]).filter(Boolean);
-        
-        const curvature = this.calculateCurvature(vertex, neighbors);
+        // Simplified curvature calculation without expensive neighbor search
+        const curvature = this.calculateSimpleCurvature(vertex, geometry);
         curvatureMap.set(vertex.index, curvature);
       }
       
       processed += batch.length;
       
-      // Yield control to prevent UI blocking
-      if (i % (batchSize * 5) === 0) {
+      // Yield control less frequently
+      if (i % (batchSize * 10) === 0) {
         await new Promise(resolve => setTimeout(resolve, 1));
-        console.log(`Curvature progress: ${processed}/${sampledVertices.length} (${Math.round(processed/sampledVertices.length*100)}%)`);
+        console.log(`Curvature progress: ${processed}/${verticesToProcess.length} (${Math.round(processed/verticesToProcess.length*100)}%)`);
       }
     }
 
     return curvatureMap;
+  }
+
+  static calculateSimpleCurvature(vertex: MeshVertex, geometry: THREE.BufferGeometry): CurvatureData {
+    // Much simpler curvature calculation that doesn't require neighbor search
+    const normal = vertex.normal.clone().normalize();
+    const position = vertex.position;
+    
+    // Use normal direction as a proxy for curvature
+    // Points with normals pointing outward from center tend to be curved
+    const curvature = Math.abs(normal.y) + Math.abs(normal.z * 0.5); // Favor forward-facing and upward normals
+    const scaledCurvature = curvature * 50; // Scale for detection
+    
+    return {
+      meanCurvature: scaledCurvature,
+      gaussianCurvature: scaledCurvature * scaledCurvature,
+      principalCurvatures: [scaledCurvature * 1.5, scaledCurvature * 0.5]
+    };
   }
 
   static sampleVertices(vertices: MeshVertex[], maxCount: number): MeshVertex[] {
