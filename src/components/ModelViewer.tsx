@@ -6,6 +6,7 @@ import { Download, RotateCcw, Maximize2, X, Move, Eye, EyeOff } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { anatomicalAnalyzer, AnatomicalLandmarks, BreastMeshData } from "@/lib/anatomicalAnalysis";
+import { MeasurementDisplay } from "./MeasurementDisplay";
 import { AnatomicalMarkers } from "./AnatomicalMarkers";
 import { ImplantMesh } from "./ImplantMesh";
 import * as THREE from "three";
@@ -443,6 +444,16 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
             </Button>
           )}
         </div>
+        
+        {/* Measurement Display */}
+        {analysisData && (
+          <div className="absolute top-2 right-2">
+            <MeasurementDisplay 
+              measurements={analysisData.measurements}
+              modelScale={analysisData.modelScale}
+            />
+          </div>
+        )}
 
         {/* Instructions */}
         {!modelUrl && !isFullscreen && (

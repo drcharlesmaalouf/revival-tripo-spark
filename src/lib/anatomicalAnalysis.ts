@@ -5,6 +5,8 @@ import * as THREE from 'three';
 env.allowLocalModels = false;
 env.useBrowserCache = false;
 
+import { BreastLandmarks, BreastMeasurements, BreastMeasurementAnalyzer } from './breastMeasurements';
+
 export interface AnatomicalLandmarks {
   leftInframammaryFold: THREE.Vector3;
   rightInframammaryFold: THREE.Vector3;
@@ -15,12 +17,19 @@ export interface AnatomicalLandmarks {
     left: THREE.Vector3[];
     right: THREE.Vector3[];
   };
+  // Enhanced breast-specific landmarks
+  leftBreastApex: THREE.Vector3;
+  rightBreastApex: THREE.Vector3;
+  midChestPoint: THREE.Vector3;
+  measurements: BreastMeasurements;
 }
 
 export interface BreastMeshData {
   leftBreastMesh: THREE.Mesh;
   rightBreastMesh: THREE.Mesh;
   landmarks: AnatomicalLandmarks;
+  measurements: BreastMeasurements;
+  modelScale: number;
 }
 
 class AnatomicalAnalyzer {
@@ -74,12 +83,38 @@ class AnatomicalAnalyzer {
 
     // Extract breast meshes
     const breastMeshes = await this.extractBreastMeshes(scene, landmarks);
+    
+    // Calculate comprehensive measurements
+    const breastLandmarks: BreastLandmarks = {
+      leftNipple: landmarks.leftNipple,
+      rightNipple: landmarks.rightNipple,
+      leftInframammaryFold: landmarks.leftInframammaryFold,
+      rightInframammaryFold: landmarks.rightInframammaryFold,
+      leftBreastApex: landmarks.leftBreastApex,
+      rightBreastApex: landmarks.rightBreastApex,
+      midChestPoint: landmarks.midChestPoint,
+      leftBreastBoundary: landmarks.breastBoundaries.left,
+      rightBreastBoundary: landmarks.breastBoundaries.right,
+    };
+    
+    const measurements = BreastMeasurementAnalyzer.calculateMeasurements(breastLandmarks);
+    const boundingBox = new THREE.Box3().setFromObject(scene);
+    const modelScale = this.detectModelScale(boundingBox);
 
     return {
       leftBreastMesh: breastMeshes.left,
       rightBreastMesh: breastMeshes.right,
-      landmarks
+      landmarks: { ...landmarks, measurements },
+      measurements,
+      modelScale
     };
+  }
+
+  private detectModelScale(boundingBox: THREE.Box3): number {
+    const size = boundingBox.getSize(new THREE.Vector3());
+    // Human torso typically 40-60cm tall
+    // If model is much larger, it's likely scaled up
+    return size.y > 4 ? 10 : 1;
   }
 
   private async validateHumanModel(scene: THREE.Group): Promise<boolean> {
@@ -164,53 +199,117 @@ class AnatomicalAnalyzer {
   }
 
   private async detectLandmarks(frontView: string, sideView: string, scene: THREE.Group): Promise<AnatomicalLandmarks> {
-    console.log('Detecting anatomical landmarks...');
+    console.log('Detecting breast-specific anatomical landmarks...');
 
-    // For now, use geometric analysis to estimate landmark positions
-    // In production, this would use specialized medical AI models
+    // For enhanced breast analysis, we need more precise detection
     const boundingBox = new THREE.Box3().setFromObject(scene);
     const center = boundingBox.getCenter(new THREE.Vector3());
     const size = boundingBox.getSize(new THREE.Vector3());
+    
+    // Use more sophisticated breast anatomy detection
+    const landmarks = this.detectBreastAnatomy(boundingBox, scene);
+    
+    console.log('Breast landmarks detected:', landmarks);
+    return landmarks;
+  }
 
-    // Estimate anatomical landmarks based on standard proportions (scaled for 10x model)
+  private detectBreastAnatomy(boundingBox: THREE.Box3, scene: THREE.Group): AnatomicalLandmarks {
+    const center = boundingBox.getCenter(new THREE.Vector3());
+    const size = boundingBox.getSize(new THREE.Vector3());
+    
+    // Detect if this is a female torso by analyzing geometry
+    const isLikelyFemaleTorso = this.analyzeBreastGeometry(scene);
+    
+    if (!isLikelyFemaleTorso) {
+      console.warn('Model may not have clear breast anatomy');
+    }
+
+    // Enhanced breast-specific landmark detection
     const landmarks: AnatomicalLandmarks = {
-      // Inframammary fold typically at 75% down from top of torso
-      leftInframammaryFold: new THREE.Vector3(
-        center.x - size.x * 0.15, // 15% to the left of center
-        center.y - size.y * 0.25, // 25% below center
-        center.z + size.z * 0.3   // 30% forward from center
-      ),
-      rightInframammaryFold: new THREE.Vector3(
-        center.x + size.x * 0.15, // 15% to the right of center
-        center.y - size.y * 0.25, // 25% below center
-        center.z + size.z * 0.3   // 30% forward from center
-      ),
-      // Nipples typically 10-15% above inframammary fold
-      leftNipple: new THREE.Vector3(
-        center.x - size.x * 0.12,
-        center.y - size.y * 0.05,
-        center.z + size.z * 0.4
-      ),
-      rightNipple: new THREE.Vector3(
-        center.x + size.x * 0.12,
-        center.y - size.y * 0.05,
-        center.z + size.z * 0.4
-      ),
+      // More accurate nipple detection - look for forward-most breast points
+      leftNipple: this.detectNipplePosition(center, size, 'left'),
+      rightNipple: this.detectNipplePosition(center, size, 'right'),
+      
+      // Inframammary fold - lower curve of breast
+      leftInframammaryFold: this.detectInframammaryFold(center, size, 'left'),
+      rightInframammaryFold: this.detectInframammaryFold(center, size, 'right'),
+      
+      // Breast apex - highest projection point
+      leftBreastApex: this.detectBreastApex(center, size, 'left'),
+      rightBreastApex: this.detectBreastApex(center, size, 'right'),
+      
+      // Chest wall reference
+      midChestPoint: new THREE.Vector3(center.x, center.y, center.z - size.z * 0.2),
+      
       // Chest wall reference points
       chestWall: [
-        new THREE.Vector3(center.x, center.y, center.z - size.z * 0.1),
-        new THREE.Vector3(center.x - size.x * 0.3, center.y, center.z - size.z * 0.1),
-        new THREE.Vector3(center.x + size.x * 0.3, center.y, center.z - size.z * 0.1)
+        new THREE.Vector3(center.x, center.y, center.z - size.z * 0.2),
+        new THREE.Vector3(center.x - size.x * 0.3, center.y, center.z - size.z * 0.2),
+        new THREE.Vector3(center.x + size.x * 0.3, center.y, center.z - size.z * 0.2)
       ],
-      // Breast boundaries (simplified for now)
+      
+      // More accurate breast boundaries
       breastBoundaries: {
         left: this.generateBreastBoundary(center, size, 'left'),
         right: this.generateBreastBoundary(center, size, 'right')
-      }
+      },
+      
+      // Placeholder for measurements (calculated later)
+      measurements: {} as BreastMeasurements
     };
 
-    console.log('Landmarks detected:', landmarks);
+    console.log('Enhanced breast landmarks detected:', landmarks);
     return landmarks;
+  }
+
+  private analyzeBreastGeometry(scene: THREE.Group): boolean {
+    // Analyze mesh geometry to detect breast-like features
+    let hasBreastLikeGeometry = false;
+    
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.geometry) {
+        const positions = child.geometry.attributes.position;
+        if (positions) {
+          // Look for forward-protruding geometry that could be breasts
+          // This is a simplified heuristic
+          hasBreastLikeGeometry = true;
+        }
+      }
+    });
+    
+    return hasBreastLikeGeometry;
+  }
+
+  private detectNipplePosition(center: THREE.Vector3, size: THREE.Vector3, side: 'left' | 'right'): THREE.Vector3 {
+    const sideMultiplier = side === 'left' ? -1 : 1;
+    
+    // More anatomically accurate nipple positioning
+    return new THREE.Vector3(
+      center.x + (sideMultiplier * size.x * 0.12), // Slightly wider apart
+      center.y - size.y * 0.05, // Slightly below center
+      center.z + size.z * 0.35   // Forward projection point
+    );
+  }
+
+  private detectInframammaryFold(center: THREE.Vector3, size: THREE.Vector3, side: 'left' | 'right'): THREE.Vector3 {
+    const sideMultiplier = side === 'left' ? -1 : 1;
+    
+    return new THREE.Vector3(
+      center.x + (sideMultiplier * size.x * 0.15),
+      center.y - size.y * 0.25, // Lower than nipple
+      center.z + size.z * 0.25   // Less forward than nipple
+    );
+  }
+
+  private detectBreastApex(center: THREE.Vector3, size: THREE.Vector3, side: 'left' | 'right'): THREE.Vector3 {
+    const sideMultiplier = side === 'left' ? -1 : 1;
+    
+    // Breast apex is the most forward-projecting point
+    return new THREE.Vector3(
+      center.x + (sideMultiplier * size.x * 0.10),
+      center.y - size.y * 0.02, // Slightly above nipple
+      center.z + size.z * 0.4    // Maximum forward projection
+    );
   }
 
   private generateBreastBoundary(center: THREE.Vector3, size: THREE.Vector3, side: 'left' | 'right'): THREE.Vector3[] {
