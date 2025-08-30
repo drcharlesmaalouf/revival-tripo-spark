@@ -228,13 +228,38 @@ export const DrawingTool = ({
     }
   }, [isDrawing, controls, currentPath, mode, onContourComplete]);
 
-  // Event listeners
+  // Event listeners with capture to override controls
   useEffect(() => {
     const canvas = gl.domElement;
     
-    canvas.addEventListener('mousedown', handleMouseDown);
-    canvas.addEventListener('mousemove', handleMouseMove);
-    canvas.addEventListener('mouseup', handleMouseUp);
+    const preventControlsMouseDown = (e: MouseEvent) => {
+      if (mode !== 'none') {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        handleMouseDown(e);
+      }
+    };
+    
+    const preventControlsMouseMove = (e: MouseEvent) => {
+      if (isDrawing) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        handleMouseMove(e);
+      }
+    };
+    
+    const preventControlsMouseUp = (e: MouseEvent) => {
+      if (isDrawing) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        handleMouseUp();
+      }
+    };
+    
+    // Use capture phase to intercept events before controls
+    canvas.addEventListener('mousedown', preventControlsMouseDown, true);
+    canvas.addEventListener('mousemove', preventControlsMouseMove, true);
+    canvas.addEventListener('mouseup', preventControlsMouseUp, true);
     
     // Set cursor based on mode
     if (mode !== 'none') {
@@ -244,12 +269,12 @@ export const DrawingTool = ({
     }
     
     return () => {
-      canvas.removeEventListener('mousedown', handleMouseDown);
-      canvas.removeEventListener('mousemove', handleMouseMove);
-      canvas.removeEventListener('mouseup', handleMouseUp);
+      canvas.removeEventListener('mousedown', preventControlsMouseDown, true);
+      canvas.removeEventListener('mousemove', preventControlsMouseMove, true);
+      canvas.removeEventListener('mouseup', preventControlsMouseUp, true);
       canvas.style.cursor = 'default';
     };
-  }, [handleMouseDown, handleMouseMove, handleMouseUp, gl, mode]);
+  }, [handleMouseDown, handleMouseMove, handleMouseUp, gl, mode, isDrawing]);
 
   return null;
 };
