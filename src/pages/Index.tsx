@@ -307,6 +307,11 @@ const Index = () => {
                     </p>
                   </div>
                   <ModelViewer modelUrl={generation.modelUrl} />
+                  {generation.modelUrl && (
+                    <div className="text-xs text-muted-foreground mt-2">
+                      Debug: Model URL = {generation.modelUrl}
+                    </div>
+                  )}
                 </div>
               </Card>
             </div>

@@ -27,15 +27,19 @@ const PlaceholderModel = () => {
 const GeneratedModel = ({ modelUrl }: { modelUrl: string }) => {
   const groupRef = useRef<any>(null);
 
+  console.log('Loading model from URL:', modelUrl);
+  
   let gltfResult = null;
   try {
     gltfResult = useGLTF(modelUrl);
+    console.log('GLTF loaded successfully:', gltfResult);
   } catch (error) {
     console.error('Error loading GLTF model:', error);
     return <PlaceholderModel />;
   }
 
   if (gltfResult?.scene) {
+    console.log('GLTF scene found, setting up model');
     // Scale and center the model
     const box = new Box3().setFromObject(gltfResult.scene);
     const center = box.getCenter(new Vector3());
@@ -50,6 +54,7 @@ const GeneratedModel = ({ modelUrl }: { modelUrl: string }) => {
     return <primitive ref={groupRef} object={gltfResult.scene} />;
   }
 
+  console.log('No GLTF scene found, showing placeholder');
   return <PlaceholderModel />;
 };
 
