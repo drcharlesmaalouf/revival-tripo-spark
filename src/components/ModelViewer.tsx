@@ -205,8 +205,7 @@ const Scene = forwardRef<any, {
   showAugmented?: boolean;
   isFullscreen?: boolean;
   onSceneLoaded?: (scene: THREE.Group) => void;
-  loadedScene?: THREE.Group | null;
-}>(({ modelUrl, meshAnalysisResults, showVisualization = false, showAugmented = false, isFullscreen = false, onSceneLoaded, loadedScene }, ref) => {
+}>(({ modelUrl, meshAnalysisResults, showVisualization = false, showAugmented = false, isFullscreen = false, onSceneLoaded }, ref) => {
   const controlsRef = useRef<any>(null);
 
   useImperativeHandle(ref, () => ({
@@ -223,16 +222,11 @@ const Scene = forwardRef<any, {
       <directionalLight position={[10, 10, 5]} intensity={1} />
       <directionalLight position={[-10, -10, -5]} intensity={0.5} />
 
-      {modelUrl && meshAnalysisResults ? (
+      {modelUrl ? (
         <group>
-          {/* Show the complete original GLTF scene */}
-          <primitive
-            object={loadedScene?.clone() || new THREE.Group()}
-            scale={[10, 10, 10]}
-            position={[0, 0, 0]}
-          />
-          {/* Add visualization markers on top */}
-          {showVisualization && meshAnalysisResults.landmarks && (
+          <GeneratedModel modelUrl={modelUrl} onSceneLoaded={onSceneLoaded} />
+          {/* Add visualization markers on top when analysis is complete */}
+          {meshAnalysisResults && showVisualization && meshAnalysisResults.landmarks && (
             <primitive
               object={BreastDetector.createVisualizationMarkers(meshAnalysisResults.landmarks)}
               scale={[10, 10, 10]}
@@ -240,8 +234,6 @@ const Scene = forwardRef<any, {
             />
           )}
         </group>
-      ) : modelUrl ? (
-        <GeneratedModel modelUrl={modelUrl} onSceneLoaded={onSceneLoaded} />
       ) : (
         <PlaceholderModel />
       )}
@@ -370,7 +362,6 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
               showAugmented={false}
               isFullscreen={false}
               onSceneLoaded={handleSceneLoaded}
-              loadedScene={loadedScene}
             />
           </Suspense>
         </Canvas>
@@ -458,7 +449,6 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                   showAugmented={showAugmented}
                   isFullscreen={true}
                   onSceneLoaded={handleSceneLoaded}
-                  loadedScene={loadedScene}
                 />
               </Suspense>
             </Canvas>
