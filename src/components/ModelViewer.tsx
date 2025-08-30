@@ -64,18 +64,9 @@ const GeneratedModel = ({
   // Use useGLTF hook properly - it handles loading states internally
   const gltfResult = useGLTF(finalUrl);
 
-  // Perform anatomical analysis when model loads - only once per unique URL
+  // Perform anatomical analysis when model loads - STOP INFINITE LOOP
   useEffect(() => {
     const modelAlreadyAnalyzed = analyzedModelUrl === finalUrl;
-    
-    console.log('Analysis effect triggered:', {
-      hasScene: !!gltfResult?.scene,
-      isAnalyzing,
-      modelAlreadyAnalyzed,
-      hasCallback: !!onAnalysisComplete,
-      finalUrl,
-      analyzedModelUrl
-    });
     
     if (gltfResult?.scene && !isAnalyzing && !modelAlreadyAnalyzed && onAnalysisComplete) {
       console.log('Starting anatomical analysis for model...');
@@ -89,7 +80,6 @@ const GeneratedModel = ({
         })
         .catch((error) => {
           console.error('Anatomical analysis failed:', error);
-          // Show error to user
           toast({
             variant: "destructive",
             title: "Analysis Failed",
@@ -100,7 +90,7 @@ const GeneratedModel = ({
           setIsAnalyzing(false);
         });
     }
-  }, [gltfResult?.scene, isAnalyzing, analyzedModelUrl, finalUrl, onAnalysisComplete, forceAnalysis]);
+  }, [finalUrl]); // ONLY depend on finalUrl to stop loops
 
   // Check if the model has loaded successfully
   if (!gltfResult?.scene) {
@@ -174,21 +164,7 @@ const Scene = forwardRef<any, {
 
       {/* Show color-coded mesh when detection visualization is enabled */}
       {isFullscreen && showMarkers && analysisData?.analyzedMesh && (
-        <>
-          {console.log('Rendering color-coded analysis mesh:', analysisData.analyzedMesh)}
-          <primitive object={analysisData.analyzedMesh} />
-        </>
-      )}
-      
-      {/* Debug info */}
-      {isFullscreen && (
-        <>
-          {console.log('Fullscreen render state:', { 
-            showMarkers, 
-            hasAnalysisData: !!analysisData, 
-            hasAnalyzedMesh: !!analysisData?.analyzedMesh 
-          })}
-        </>
+        <primitive object={analysisData.analyzedMesh} />
       )}
 
       {/* Anatomical markers and implants overlay - only show in fullscreen */}
@@ -541,40 +517,35 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                   <RotateCcw className="w-4 h-4" />
                 </Button>
 
-                {/* Analysis controls - always show in fullscreen for debugging */}
+                {/* FIXED BUTTONS - Always show */}
                 <Button
                   variant="secondary"
                   size="sm"
-                  className="bg-background/80 backdrop-blur-sm hover:bg-background/90 text-xs"
-                  onClick={() => console.log('Analysis state:', { analysisData: !!analysisData, modelUrl: !!modelUrl })}
+                  onClick={handleReset}
+                  className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
                 >
-                  Debug
+                  <RotateCcw className="w-4 h-4" />
                 </Button>
 
-                {/* Force show eye button if we have any data */}
                 <Button
                   variant={showMarkers ? "default" : "secondary"}
                   size="sm"
-                  onClick={() => {
-                    console.log('Toggling showMarkers from', showMarkers, 'to', !showMarkers);
-                    console.log('Current analysisData:', analysisData);
-                    setShowMarkers(!showMarkers);
-                  }}
+                  onClick={() => setShowMarkers(!showMarkers)}
                   className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
-                  title="Toggle detection visualization"
+                  title="Toggle breast detection colors"
                 >
                   {showMarkers ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </Button>
 
-                    <Button
-                      variant={showImplants ? "default" : "secondary"}
-                      size="sm"
-                      onClick={() => setShowImplants(!showImplants)}
-                      className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
-                      title="Toggle implant preview"
-                    >
-                      <span className="w-4 h-4 text-xs font-bold">300</span>
-                    </Button>
+                <Button
+                  variant={showImplants ? "default" : "secondary"}
+                  size="sm"
+                  onClick={() => setShowImplants(!showImplants)}
+                  className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
+                  title="Toggle implant preview"
+                >
+                  <span className="w-4 h-4 text-xs font-bold">300</span>
+                </Button>
 
                 {modelUrl && (
                   <Button
