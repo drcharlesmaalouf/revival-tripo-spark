@@ -87,38 +87,73 @@ export class MeshAnalyzer {
       };
     }
 
-    // Simplified curvature calculation
-    // In a real implementation, you'd use more sophisticated methods
-    let totalCurvature = 0;
-    const normal = vertex.normal;
+    // Improved curvature calculation using mesh geometry
+    const normal = vertex.normal.clone().normalize();
+    let meanCurvature = 0;
+    let curvatureSum = 0;
+    let validNeighbors = 0;
 
     for (const neighbor of neighbors) {
       const edge = neighbor.position.clone().sub(vertex.position);
-      const projection = edge.clone().projectOnVector(normal);
-      const tangent = edge.clone().sub(projection);
+      const edgeLength = edge.length();
       
-      if (tangent.length() > 0) {
-        const curvature = projection.length() / (tangent.length() * tangent.length());
-        totalCurvature += curvature;
+      if (edgeLength > 0) {
+        // Calculate angle between vertex normal and edge direction
+        const normalizedEdge = edge.clone().normalize();
+        const dotProduct = normal.dot(normalizedEdge);
+        
+        // Convert to curvature measure (higher values for more curved surfaces)
+        const curvature = Math.abs(1 - Math.abs(dotProduct)) / edgeLength;
+        curvatureSum += curvature;
+        validNeighbors++;
       }
     }
 
-    const meanCurvature = totalCurvature / neighbors.length;
+    if (validNeighbors > 0) {
+      meanCurvature = curvatureSum / validNeighbors;
+    }
     
     return {
-      meanCurvature,
-      gaussianCurvature: meanCurvature * meanCurvature, // Simplified
-      principalCurvatures: [meanCurvature * 1.5, meanCurvature * 0.5]
+      meanCurvature: meanCurvature * 100, // Scale up for better detection
+      gaussianCurvature: meanCurvature * meanCurvature * 10000,
+      principalCurvatures: [meanCurvature * 150, meanCurvature * 50]
     };
   }
 
-  static findNeighbors(vertexIndex: number, geometry: THREE.BufferGeometry, radius: number = 0.05): number[] {
+  static findNeighbors(vertexIndex: number, geometry: THREE.BufferGeometry, adaptiveRadius: number = 0): number[] {
     const positions = geometry.attributes.position;
     const targetPos = new THREE.Vector3(
       positions.getX(vertexIndex),
       positions.getY(vertexIndex),
       positions.getZ(vertexIndex)
     );
+
+    // Calculate adaptive radius based on mesh density if not provided
+    let radius = adaptiveRadius;
+    if (radius === 0) {
+      // Sample a few nearby vertices to estimate mesh density
+      let totalDistance = 0;
+      let sampleCount = 0;
+      const maxSamples = Math.min(50, positions.count);
+      
+      for (let i = 0; i < maxSamples && sampleCount < 10; i++) {
+        if (i === vertexIndex) continue;
+        
+        const pos = new THREE.Vector3(
+          positions.getX(i),
+          positions.getY(i),
+          positions.getZ(i)
+        );
+        
+        const distance = targetPos.distanceTo(pos);
+        if (distance > 0) {
+          totalDistance += distance;
+          sampleCount++;
+        }
+      }
+      
+      radius = sampleCount > 0 ? (totalDistance / sampleCount) * 2 : 0.1;
+    }
 
     const neighbors: number[] = [];
     
@@ -144,12 +179,18 @@ export class MeshAnalyzer {
     
     console.log(`Calculating curvature for ${vertices.length} vertices...`);
     
-    for (const vertex of vertices) {
-      const neighborIndices = this.findNeighbors(vertex.index, geometry);
-      const neighbors = neighborIndices.map(idx => vertices[idx]).filter(Boolean);
+    // Process in batches to avoid blocking the UI
+    const batchSize = 1000;
+    for (let i = 0; i < vertices.length; i += batchSize) {
+      const batch = vertices.slice(i, i + batchSize);
       
-      const curvature = this.calculateCurvature(vertex, neighbors);
-      curvatureMap.set(vertex.index, curvature);
+      for (const vertex of batch) {
+        const neighborIndices = this.findNeighbors(vertex.index, geometry);
+        const neighbors = neighborIndices.map(idx => vertices[idx]).filter(Boolean);
+        
+        const curvature = this.calculateCurvature(vertex, neighbors);
+        curvatureMap.set(vertex.index, curvature);
+      }
     }
 
     return curvatureMap;

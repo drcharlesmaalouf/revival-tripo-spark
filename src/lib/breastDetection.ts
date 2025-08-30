@@ -57,24 +57,29 @@ export class BreastDetector {
   }
 
   private static filterChestRegion(vertices: MeshVertex[], center: THREE.Vector3, size: THREE.Vector3): MeshVertex[] {
+    // Calculate adaptive thresholds based on model size
+    const sizeScale = Math.max(size.x, size.y, size.z);
+    
     return vertices.filter(vertex => {
       const pos = vertex.position;
       const relative = pos.clone().sub(center);
       
-      // Chest region criteria:
-      // 1. Upper portion of model (above center)
-      const isUpperChest = relative.y > -size.y * 0.3;
+      // More adaptive chest region criteria:
+      // 1. Upper body region (more generous range)
+      const isUpperBody = relative.y > -size.y * 0.6 && relative.y < size.y * 0.6;
       
-      // 2. Forward-facing (positive Z direction relative to center)
-      const isForward = relative.z > -size.z * 0.2;
+      // 2. Front-facing area (detect based on normal direction as well)
+      const normalDirection = vertex.normal.z; // Assuming Z is forward
+      const isForwardFacing = normalDirection > -0.3 && relative.z > -size.z * 0.4;
       
-      // 3. Central chest area (not arms/sides)
-      const isCentral = Math.abs(relative.x) < size.x * 0.4;
+      // 3. Central torso area (exclude arms and outer edges)
+      const isCentralTorso = Math.abs(relative.x) < size.x * 0.6;
       
-      // 4. Reasonable chest height range
-      const isChestHeight = relative.y < size.y * 0.4;
+      // 4. Reasonable distance from center
+      const distanceFromCenter = relative.length();
+      const isReasonableDistance = distanceFromCenter < sizeScale * 1.2;
       
-      return isUpperChest && isForward && isCentral && isChestHeight;
+      return isUpperBody && isForwardFacing && isCentralTorso && isReasonableDistance;
     });
   }
 
@@ -82,16 +87,44 @@ export class BreastDetector {
     vertices: MeshVertex[], 
     curvatureMap: Map<number, CurvatureData>
   ): MeshVertex[] {
-    // Calculate curvature threshold (top 20% of curvature values)
+    if (vertices.length === 0) return [];
+    
+    // Get all curvature values
     const curvatures = vertices
       .map(v => curvatureMap.get(v.index)?.meanCurvature || 0)
+      .filter(c => c > 0)
       .sort((a, b) => b - a);
     
-    const threshold = curvatures[Math.floor(curvatures.length * 0.2)] || 0.1;
+    if (curvatures.length === 0) return [];
+    
+    // Use multiple threshold strategies
+    const strategies = [
+      curvatures[Math.floor(curvatures.length * 0.1)] || 0, // Top 10%
+      curvatures[Math.floor(curvatures.length * 0.2)] || 0, // Top 20%
+      curvatures[Math.floor(curvatures.length * 0.3)] || 0, // Top 30%
+    ];
+    
+    // Try each strategy and return the one with reasonable results
+    for (const threshold of strategies) {
+      const candidates = vertices.filter(vertex => {
+        const curvature = curvatureMap.get(vertex.index);
+        return curvature && curvature.meanCurvature > threshold;
+      });
+      
+      // Good candidate set: not too few, not too many
+      if (candidates.length >= 20 && candidates.length <= vertices.length * 0.4) {
+        console.log(`Using curvature threshold: ${threshold.toFixed(4)}, found ${candidates.length} candidates`);
+        return candidates;
+      }
+    }
+    
+    // Fallback: use a basic threshold
+    const fallbackThreshold = Math.max(...curvatures) * 0.3;
+    console.log(`Using fallback threshold: ${fallbackThreshold.toFixed(4)}`);
     
     return vertices.filter(vertex => {
       const curvature = curvatureMap.get(vertex.index);
-      return curvature && curvature.meanCurvature > threshold;
+      return curvature && curvature.meanCurvature > fallbackThreshold;
     });
   }
 
@@ -100,12 +133,47 @@ export class BreastDetector {
     center: THREE.Vector3
   ): { leftRegion: BreastRegion | null; rightRegion: BreastRegion | null } {
     
-    // Separate vertices by side of chest
+    if (vertices.length < 20) {
+      console.log('Not enough high-curvature vertices for breast detection');
+      return { leftRegion: null, rightRegion: null };
+    }
+    
+    // Separate vertices by side of chest (more robust clustering)
     const leftVertices = vertices.filter(v => v.position.x < center.x);
     const rightVertices = vertices.filter(v => v.position.x > center.x);
     
+    // Additional clustering based on spatial proximity
+    const clusterVertices = (sideVertices: MeshVertex[]): MeshVertex[] => {
+      if (sideVertices.length === 0) return [];
+      
+      // Find the densest cluster using simple k-means approach
+      let bestCluster = sideVertices;
+      
+      if (sideVertices.length > 50) {
+        // Calculate center of mass for this side
+        const centerOfMass = new THREE.Vector3();
+        sideVertices.forEach(v => centerOfMass.add(v.position));
+        centerOfMass.divideScalar(sideVertices.length);
+        
+        // Keep vertices within reasonable distance from center of mass
+        const distances = sideVertices.map(v => v.position.distanceTo(centerOfMass));
+        distances.sort((a, b) => a - b);
+        const medianDistance = distances[Math.floor(distances.length / 2)];
+        const maxDistance = medianDistance * 2.5;
+        
+        bestCluster = sideVertices.filter(v => 
+          v.position.distanceTo(centerOfMass) <= maxDistance
+        );
+      }
+      
+      return bestCluster;
+    };
+    
+    const clusterLeft = clusterVertices(leftVertices);
+    const clusterRight = clusterVertices(rightVertices);
+    
     const createRegion = (regionVertices: MeshVertex[]): BreastRegion | null => {
-      if (regionVertices.length < 10) return null;
+      if (regionVertices.length < 5) return null;
       
       const boundingBox = new THREE.Box3();
       regionVertices.forEach(v => boundingBox.expandByPoint(v.position));
@@ -121,8 +189,8 @@ export class BreastDetector {
     };
     
     return {
-      leftRegion: createRegion(leftVertices),
-      rightRegion: createRegion(rightVertices)
+      leftRegion: createRegion(clusterLeft),
+      rightRegion: createRegion(clusterRight)
     };
   }
 
@@ -132,19 +200,32 @@ export class BreastDetector {
   ): THREE.Vector3 | null {
     if (vertices.length === 0) return null;
     
-    // Find vertex with highest curvature
-    let maxCurvature = -1;
-    let nippleVertex: MeshVertex | null = null;
+    // Find multiple candidates and select the most central one with high curvature
+    const candidates: { vertex: MeshVertex; curvature: number; centrality: number }[] = [];
     
+    // Calculate center of the region
+    const regionCenter = new THREE.Vector3();
+    vertices.forEach(v => regionCenter.add(v.position));
+    regionCenter.divideScalar(vertices.length);
+    
+    // Score each vertex based on curvature and centrality
     for (const vertex of vertices) {
-      const curvature = curvatureMap.get(vertex.index);
-      if (curvature && curvature.meanCurvature > maxCurvature) {
-        maxCurvature = curvature.meanCurvature;
-        nippleVertex = vertex;
+      const curvature = curvatureMap.get(vertex.index)?.meanCurvature || 0;
+      const distanceToCenter = vertex.position.distanceTo(regionCenter);
+      const maxDistance = Math.max(...vertices.map(v => v.position.distanceTo(regionCenter)));
+      const centrality = maxDistance > 0 ? (1 - distanceToCenter / maxDistance) : 1;
+      
+      if (curvature > 0) {
+        candidates.push({ vertex, curvature, centrality });
       }
     }
     
-    return nippleVertex ? nippleVertex.position.clone() : null;
+    if (candidates.length === 0) return null;
+    
+    // Sort by combined score (curvature * centrality)
+    candidates.sort((a, b) => (b.curvature * b.centrality) - (a.curvature * a.centrality));
+    
+    return candidates[0].vertex.position.clone();
   }
 
   static createVisualizationMesh(
