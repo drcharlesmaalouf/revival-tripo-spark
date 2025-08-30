@@ -47,7 +47,7 @@ const GeneratedModel = ({
 }) => {
   const groupRef = useRef<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [hasAnalyzed, setHasAnalyzed] = useState(false);
+  const [analyzedModelUrl, setAnalyzedModelUrl] = useState<string>('');
   const { toast } = useToast();
 
   // Check if it's a blob URL - use directly, otherwise use proxy
@@ -58,30 +58,26 @@ const GeneratedModel = ({
 
   console.log('Loading model:', { original: modelUrl, final: finalUrl, useProxy: shouldUseProxy });
 
-  // Reset analysis state when model URL changes
-  useEffect(() => {
-    console.log('Model URL changed, resetting analysis state');
-    setHasAnalyzed(false);
-    setIsAnalyzing(false);
-  }, [finalUrl]);
-
   // Use useGLTF hook properly - it handles loading states internally
   const gltfResult = useGLTF(finalUrl);
 
-  // Perform anatomical analysis when model loads
+  // Perform anatomical analysis when model loads - only once per unique URL
   useEffect(() => {
+    const modelAlreadyAnalyzed = analyzedModelUrl === finalUrl;
+    
     console.log('Analysis effect triggered:', {
       hasScene: !!gltfResult?.scene,
       isAnalyzing,
-      hasAnalyzed,
+      modelAlreadyAnalyzed,
       hasCallback: !!onAnalysisComplete,
-      finalUrl
+      finalUrl,
+      analyzedModelUrl
     });
     
-    if (gltfResult?.scene && !isAnalyzing && !hasAnalyzed && onAnalysisComplete) {
+    if (gltfResult?.scene && !isAnalyzing && !modelAlreadyAnalyzed && onAnalysisComplete) {
       console.log('Starting anatomical analysis for model...');
       setIsAnalyzing(true);
-      setHasAnalyzed(true);
+      setAnalyzedModelUrl(finalUrl);
       
       anatomicalAnalyzer.analyzeModel(gltfResult.scene)
         .then((analysisData) => {
@@ -101,7 +97,7 @@ const GeneratedModel = ({
           setIsAnalyzing(false);
         });
     }
-  }, [gltfResult?.scene, isAnalyzing, hasAnalyzed, onAnalysisComplete]);
+  }, [gltfResult?.scene, isAnalyzing, analyzedModelUrl, finalUrl, onAnalysisComplete]);
 
   // Check if the model has loaded successfully
   if (!gltfResult?.scene) {
