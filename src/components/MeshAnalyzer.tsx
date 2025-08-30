@@ -93,7 +93,7 @@ export const MeshAnalyzerComponent = ({
     };
 
     analyzeScene();
-  }, [scene, augmentationParams, onAnalysisComplete, isAnalyzing, toast]);
+  }, [scene, augmentationParams, onAnalysisComplete, toast]);
 
   // This component doesn't render anything visible
   return null;
