@@ -171,9 +171,23 @@ const Scene = forwardRef<any, {
         <PlaceholderModel />
       )}
 
-      {/* Show color-coded mesh ONLY in fullscreen mode when specifically requested */}
+      {/* Show color-coded mesh when detection visualization is enabled */}
       {isFullscreen && showMarkers && analysisData?.analyzedMesh && (
-        <primitive object={analysisData.analyzedMesh} />
+        <>
+          {console.log('Rendering color-coded analysis mesh:', analysisData.analyzedMesh)}
+          <primitive object={analysisData.analyzedMesh} />
+        </>
+      )}
+      
+      {/* Debug info */}
+      {isFullscreen && (
+        <>
+          {console.log('Fullscreen render state:', { 
+            showMarkers, 
+            hasAnalysisData: !!analysisData, 
+            hasAnalyzedMesh: !!analysisData?.analyzedMesh 
+          })}
+        </>
       )}
 
       {/* Anatomical markers and implants overlay - only show in fullscreen */}

@@ -493,7 +493,12 @@ class AnatomicalAnalyzer {
     colorCodedMesh.scale.copy(originalMesh.scale);
     colorCodedMesh.matrixAutoUpdate = originalMesh.matrixAutoUpdate;
     
-    console.log('Color-coded mesh created successfully');
+    console.log('Color-coded mesh created successfully with', vertexCount, 'vertices');
+    console.log('Mesh details:', {
+      hasColors: !!geometry.attributes.color,
+      position: colorCodedMesh.position,
+      scale: colorCodedMesh.scale
+    });
     
     return colorCodedMesh;
   }
