@@ -162,9 +162,19 @@ const Scene = forwardRef<any, {
         <PlaceholderModel />
       )}
 
-      {/* Show color-coded mesh when detection visualization is enabled */}
-      {isFullscreen && showMarkers && analysisData?.analyzedMesh && (
-        <primitive object={analysisData.analyzedMesh} />
+      {/* Show color-coded mesh when enabled - ALWAYS try to render if showMarkers is true */}
+      {isFullscreen && showMarkers && (
+        <>
+          {console.log('ATTEMPTING TO RENDER COLOR MESH - showMarkers:', showMarkers, 'analysisData:', !!analysisData, 'analyzedMesh:', !!analysisData?.analyzedMesh)}
+          {analysisData?.analyzedMesh ? (
+            <primitive object={analysisData.analyzedMesh} />
+          ) : (
+            <mesh>
+              <boxGeometry args={[0.1, 0.1, 0.1]} />
+              <meshBasicMaterial color="red" />
+            </mesh>
+          )}
+        </>
       )}
 
       {/* Anatomical markers and implants overlay - only show in fullscreen */}
@@ -506,18 +516,8 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                 </Suspense>
               </Canvas>
 
-              {/* Analysis controls in fullscreen - at bottom center */}
+              {/* Analysis controls in fullscreen - bottom center */}
               <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleReset}
-                  className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                </Button>
-
-                {/* FIXED BUTTONS - Always show */}
                 <Button
                   variant="secondary"
                   size="sm"
@@ -530,9 +530,11 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                 <Button
                   variant={showMarkers ? "default" : "secondary"}
                   size="sm"
-                  onClick={() => setShowMarkers(!showMarkers)}
+                  onClick={() => {
+                    console.log('Eye button clicked! showMarkers:', showMarkers, '-> ', !showMarkers);
+                    setShowMarkers(!showMarkers);
+                  }}
                   className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
-                  title="Toggle breast detection colors"
                 >
                   {showMarkers ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </Button>
@@ -542,7 +544,6 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                   size="sm"
                   onClick={() => setShowImplants(!showImplants)}
                   className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
-                  title="Toggle implant preview"
                 >
                   <span className="w-4 h-4 text-xs font-bold">300</span>
                 </Button>
