@@ -197,8 +197,9 @@ const Scene = forwardRef<any, {
         enablePan={true}
         enableZoom={true}
         enableRotate={true}
-        minDistance={0.5}
-        maxDistance={15}
+        minDistance={0.1}
+        maxDistance={50}
+        autoRotate={false}
       />
     </>
   );
@@ -340,7 +341,7 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
       {/* Normal viewer */}
       <div className={`relative h-full w-full overflow-hidden rounded-lg bg-gradient-secondary ${isFullscreen ? 'opacity-50' : ''}`}>
         <Canvas
-          camera={{ position: [4, 4, 4], fov: 50 }}
+          camera={{ position: [2, 1, 2], fov: 50 }}
           style={{ background: "transparent" }}
           onCreated={({ gl }) => {
             // Handle WebGL context loss
@@ -495,7 +496,7 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
             {/* Window content */}
             <div className="relative bg-gradient-secondary" style={{ height: windowSize.height - 48 }}>
               <Canvas
-                camera={{ position: [4, 4, 4], fov: 50 }}
+                camera={{ position: [2, 1, 2], fov: 50 }}
                 style={{ background: "transparent" }}
                 onCreated={({ gl }) => {
                   // Handle WebGL context loss for fullscreen viewer too
