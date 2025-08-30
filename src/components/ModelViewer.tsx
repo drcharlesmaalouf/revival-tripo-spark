@@ -1,118 +1,11 @@
-import { Suspense, useRef, useState, useEffect } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, Environment, Box, useGLTF } from "@react-three/drei";
-import { Mesh, Box3, Vector3 } from "three";
-import { Download, RotateCcw, Maximize2, X, Move } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 interface ModelViewerProps {
   modelUrl?: string;
 }
 
-const PlaceholderModel = () => {
-  const meshRef = useRef<Mesh>(null);
-
-  return (
-    <Box ref={meshRef} args={[2, 2, 2]}>
-      <meshStandardMaterial
-        color="#8B5CF6"
-        metalness={0.1}
-        roughness={0.3}
-      />
-    </Box>
-  );
-};
-
-const GeneratedModel = ({ modelUrl }: { modelUrl: string }) => {
-  const groupRef = useRef<any>(null);
-  const [loadError, setLoadError] = useState(false);
-
-  console.log('Loading model from URL:', modelUrl);
-  
-  // Add error boundary for model loading
-  let gltfResult = null;
-  try {
-    gltfResult = useGLTF(modelUrl);
-    console.log('GLTF loaded successfully:', gltfResult);
-    setLoadError(false);
-  } catch (error) {
-    console.error('Error loading GLTF model:', error);
-    setLoadError(true);
-    return <PlaceholderModel />;
-  }
-
-  // Check if URL is accessible
-  useEffect(() => {
-    if (modelUrl) {
-      fetch(modelUrl, { method: 'HEAD' })
-        .then(response => {
-          if (!response.ok) {
-            console.error('Model URL not accessible:', response.status, response.statusText);
-            setLoadError(true);
-          }
-        })
-        .catch(error => {
-          console.error('Error checking model URL:', error);
-          setLoadError(true);
-        });
-    }
-  }, [modelUrl]);
-
-  if (loadError) {
-    console.log('Load error detected, showing placeholder');
-    return <PlaceholderModel />;
-  }
-
-  if (gltfResult?.scene) {
-    console.log('GLTF scene found, setting up model');
-    try {
-      // Scale and center the model
-      const box = new Box3().setFromObject(gltfResult.scene);
-      const center = box.getCenter(new Vector3());
-      const size = box.getSize(new Vector3());
-      
-      const maxDim = Math.max(size.x, size.y, size.z);
-      const scale = maxDim > 0 ? 3 / maxDim : 1; // Prevent division by zero
-      
-      gltfResult.scene.scale.setScalar(scale);
-      gltfResult.scene.position.copy(center.multiplyScalar(-scale));
-
-      return <primitive ref={groupRef} object={gltfResult.scene} />;
-    } catch (error) {
-      console.error('Error setting up 3D model:', error);
-      return <PlaceholderModel />;
-    }
-  }
-
-  console.log('No GLTF scene found, showing placeholder');
-  return <PlaceholderModel />;
-};
-
-const LoadingModel = () => {
-  const meshRef = useRef<Mesh>(null);
-
-  useFrame((state) => {
-    if (meshRef.current) {
-      meshRef.current.rotation.y = state.clock.elapsedTime * 0.5;
-    }
-  });
-
-  return (
-    <Box ref={meshRef} args={[1.5, 1.5, 1.5]}>
-      <meshStandardMaterial
-        color="#6366f1"
-        metalness={0.2}
-        roughness={0.8}
-        transparent
-        opacity={0.7}
-      />
-    </Box>
-  );
-};
-
 export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const { toast } = useToast();
 
   const downloadModel = async () => {
@@ -152,79 +45,32 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
     }
   };
 
-  const ViewerContent = () => (
-    <div className="relative w-full h-full">
-      <Canvas
-        camera={{ position: [5, 5, 5], fov: 45 }}
-        style={{ background: 'radial-gradient(circle, hsl(240 10% 8%) 0%, hsl(240 10% 3.9%) 100%)' }}
-      >
-        <Suspense fallback={<LoadingModel />}>
-          <ambientLight intensity={0.4} />
-          <directionalLight position={[10, 10, 5]} intensity={0.8} castShadow />
-          <pointLight position={[-10, -10, -10]} intensity={0.3} />
-          
-          {modelUrl ? (
-            <GeneratedModel modelUrl={modelUrl} />
-          ) : (
-            <PlaceholderModel />
-          )}
-          
-          <Environment preset="studio" />
-          <OrbitControls
-            enablePan={true}
-            enableZoom={true}
-            enableRotate={true}
-            minDistance={2}
-            maxDistance={20}
-          />
-        </Suspense>
-      </Canvas>
-
-      {/* Controls Overlay */}
-      <div className="absolute top-4 right-4 flex flex-col gap-2">
-        {modelUrl && (
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={downloadModel}
-            className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
-          >
-            <Download className="h-4 w-4" />
-          </Button>
-        )}
-        
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => setIsFullscreen(!isFullscreen)}
-          className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
-        >
-          {isFullscreen ? <X className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-        </Button>
-      </div>
-
-      {/* Instructions */}
-      <div className="absolute bottom-4 left-4 bg-background/80 backdrop-blur-sm rounded-lg p-3 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2 mb-1">
-          <Move className="h-3 w-3" />
-          <span>Click & drag to rotate</span>
-        </div>
-        <div>Scroll to zoom • Right-click & drag to pan</div>
-      </div>
-    </div>
-  );
-
-  if (isFullscreen) {
-    return (
-      <div className="fixed inset-0 z-50 bg-background">
-        <ViewerContent />
-      </div>
-    );
-  }
-
   return (
-    <div className="w-full h-[500px] rounded-xl border border-border overflow-hidden shadow-lg">
-      <ViewerContent />
+    <div className="w-full h-96 bg-gradient-to-br from-muted to-accent/10 rounded-xl border border-border flex items-center justify-center">
+      <div className="text-center space-y-4">
+        <div className="text-4xl">🎯</div>
+        <div>
+          <h3 className="font-semibold">3D Viewer</h3>
+          {modelUrl ? (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Model ready for download</p>
+              <button 
+                onClick={downloadModel}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+              >
+                Download Model
+              </button>
+              <p className="text-xs text-muted-foreground break-all max-w-md">
+                URL: {modelUrl}
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Generate a model to see it here
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
