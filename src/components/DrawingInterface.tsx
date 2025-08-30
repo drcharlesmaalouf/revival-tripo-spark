@@ -16,7 +16,12 @@ import { Circle, Target, Ruler, RotateCcw } from 'lucide-react';
 
 interface DrawingInterfaceProps {
   scene: THREE.Group | null;
-  onMeasurementsComplete: (measurements: CalculatedMeasurements) => void;
+  onMeasurementsComplete: (measurements: CalculatedMeasurements, annotations: {
+    leftContour: BreastContour;
+    rightContour: BreastContour;
+    leftNipple: NippleMarker;
+    rightNipple: NippleMarker;
+  }) => void;
   onModeChange: (mode: 'leftContour' | 'rightContour' | 'leftNipple' | 'rightNipple' | 'none') => void;
   onGetHandlers?: (handlers: {
     handleContourComplete: (contour: BreastContour) => void;
@@ -149,8 +154,14 @@ export const DrawingInterface = ({
     };
 
     const measurements = ManualMeasurementCalculator.calculateAllMeasurements(updatedAnnotations);
-    if (measurements) {
-      onMeasurementsComplete(measurements);
+    if (measurements && annotations.leftContour && annotations.rightContour && 
+        annotations.leftNipple && annotations.rightNipple) {
+      onMeasurementsComplete(measurements, {
+        leftContour: annotations.leftContour,
+        rightContour: annotations.rightContour,
+        leftNipple: annotations.leftNipple,
+        rightNipple: annotations.rightNipple
+      });
       console.log('Measurements completed:', measurements);
     } else {
       alert('Please complete all annotations before calculating measurements');

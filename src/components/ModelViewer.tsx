@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { DrawingInterface } from "./DrawingInterface";
 import { DrawingTool } from "./DrawingTool";
+import { BreastSimulator } from "./BreastSimulator";
 import { CalculatedMeasurements, BreastContour, NippleMarker } from "@/lib/manualMeasurements";
 import * as THREE from "three";
 
@@ -207,6 +208,12 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
   // Drawing tool state
   const [calculatedMeasurements, setCalculatedMeasurements] = useState<CalculatedMeasurements | null>(null);
   const [drawingMode, setDrawingMode] = useState<'leftContour' | 'rightContour' | 'leftNipple' | 'rightNipple' | 'none'>('none');
+  const [breastAnnotations, setBreastAnnotations] = useState<{
+    leftContour: BreastContour;
+    rightContour: BreastContour;
+    leftNipple: NippleMarker;
+    rightNipple: NippleMarker;
+  } | null>(null);
   
   // Drawing interface handlers
   const [interfaceHandlers, setInterfaceHandlers] = useState<{
@@ -221,15 +228,25 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
     if (modelUrl) {
       setLoadedScene(null);
       setCalculatedMeasurements(null);
+      setBreastAnnotations(null);
     }
   }, [modelUrl]);
 
-  const handleMeasurementsComplete = useCallback((measurements: CalculatedMeasurements) => {
+  const handleMeasurementsComplete = useCallback((
+    measurements: CalculatedMeasurements,
+    annotations: {
+      leftContour: BreastContour;
+      rightContour: BreastContour;
+      leftNipple: NippleMarker;
+      rightNipple: NippleMarker;
+    }
+  ) => {
     console.log('Manual measurements complete:', measurements);
     setCalculatedMeasurements(measurements);
+    setBreastAnnotations(annotations);
     toast({
-      title: "Measurements Complete",
-      description: "All breast measurements have been calculated from your annotations.",
+      title: "Analysis Complete",
+      description: "Breast measurements calculated. Simulation tools are now available.",
     });
   }, [toast]);
 
@@ -390,6 +407,18 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                onMeasurementsComplete={handleMeasurementsComplete}
                onModeChange={setDrawingMode}
                onGetHandlers={handleGetHandlers}
+             />
+           )}
+
+           {/* Breast Simulator - show when measurements and annotations are complete */}
+           {isFullscreen && calculatedMeasurements && breastAnnotations && loadedScene && (
+             <BreastSimulator
+               scene={loadedScene}
+               measurements={calculatedMeasurements}
+               leftContour={breastAnnotations.leftContour}
+               rightContour={breastAnnotations.rightContour}
+               leftNipple={breastAnnotations.leftNipple}
+               rightNipple={breastAnnotations.rightNipple}
              />
            )}
 
