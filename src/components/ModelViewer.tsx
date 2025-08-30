@@ -50,6 +50,7 @@ const GeneratedModel = ({
   const groupRef = useRef<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzedModelUrl, setAnalyzedModelUrl] = useState<string>('');
+  const [forceReanalysis, setForceReanalysis] = useState(0);
   const { toast } = useToast();
 
   // Check if it's a blob URL - use directly, otherwise use proxy
@@ -63,20 +64,17 @@ const GeneratedModel = ({
   // Use useGLTF hook properly - it handles loading states internally
   const gltfResult = useGLTF(finalUrl);
 
-  // Perform anatomical analysis when model loads - only once per unique URL
+  // Perform anatomical analysis when model loads
   useEffect(() => {
-    const modelAlreadyAnalyzed = analyzedModelUrl === finalUrl;
-    
     console.log('Analysis effect triggered:', {
       hasScene: !!gltfResult?.scene,
       isAnalyzing,
-      modelAlreadyAnalyzed,
-      hasCallback: !!onAnalysisComplete,
       finalUrl,
-      analyzedModelUrl
+      hasCallback: !!onAnalysisComplete,
+      forceReanalysis
     });
     
-    if (gltfResult?.scene && !isAnalyzing && !modelAlreadyAnalyzed && onAnalysisComplete) {
+    if (gltfResult?.scene && !isAnalyzing && onAnalysisComplete) {
       console.log('Starting anatomical analysis for model...');
       setIsAnalyzing(true);
       setAnalyzedModelUrl(finalUrl);
@@ -99,7 +97,7 @@ const GeneratedModel = ({
           setIsAnalyzing(false);
         });
     }
-  }, [gltfResult?.scene, isAnalyzing, analyzedModelUrl, finalUrl, onAnalysisComplete]);
+  }, [gltfResult?.scene, isAnalyzing, finalUrl, onAnalysisComplete, forceReanalysis]);
 
   // Check if the model has loaded successfully
   if (!gltfResult?.scene) {
@@ -243,9 +241,10 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
     });
   };
 
-  // Clear analysis data when model changes
+  // Clear analysis data when model changes and force re-analysis
   useEffect(() => {
     if (modelUrl) {
+      console.log('Model URL changed, clearing analysis data:', modelUrl);
       setAnalysisData(null);
       setShowMarkers(false);
       setShowImplants(false);
