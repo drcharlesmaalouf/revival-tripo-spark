@@ -104,14 +104,15 @@ const AnalyzedMesh = ({
   showVisualization: boolean;
   showAugmented: boolean;
 }) => {
-  const meshToShow = showAugmented && augmentedMesh 
-    ? augmentedMesh 
-    : originalMesh; // Always use original mesh, not the visualization mesh
+  // Clone the original mesh to prevent any modifications
+  const displayMesh = showAugmented && augmentedMesh 
+    ? augmentedMesh.clone()
+    : originalMesh.clone();
 
   return (
     <group>
       <primitive
-        object={meshToShow}
+        object={displayMesh}
         scale={[10, 10, 10]}
         position={[0, 0, 0]}
       />
