@@ -47,6 +47,7 @@ const GeneratedModel = ({
 }) => {
   const groupRef = useRef<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [hasAnalyzed, setHasAnalyzed] = useState(false);
 
   // Check if it's a blob URL - use directly, otherwise use proxy
   const shouldUseProxy = !modelUrl.startsWith('blob:') && !modelUrl.startsWith('data:');
@@ -61,8 +62,10 @@ const GeneratedModel = ({
 
   // Perform anatomical analysis when model loads
   useEffect(() => {
-    if (gltfResult?.scene && !isAnalyzing && onAnalysisComplete) {
+    if (gltfResult?.scene && !isAnalyzing && !hasAnalyzed && onAnalysisComplete) {
       setIsAnalyzing(true);
+      setHasAnalyzed(true);
+      
       anatomicalAnalyzer.analyzeModel(gltfResult.scene)
         .then((analysisData) => {
           console.log('Anatomical analysis complete:', analysisData);
@@ -70,12 +73,14 @@ const GeneratedModel = ({
         })
         .catch((error) => {
           console.error('Anatomical analysis failed:', error);
+          // Don't trigger the onAnalysisComplete if validation fails
+          // This prevents the success toast from showing for invalid models
         })
         .finally(() => {
           setIsAnalyzing(false);
         });
     }
-  }, [gltfResult?.scene, isAnalyzing, onAnalysisComplete]);
+  }, [gltfResult?.scene, isAnalyzing, hasAnalyzed, onAnalysisComplete]);
 
   // Check if the model has loaded successfully
   if (!gltfResult?.scene) {
@@ -206,6 +211,15 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
       description: "Anatomical landmarks detected and breast regions isolated.",
     });
   };
+
+  // Clear analysis data when model changes
+  useEffect(() => {
+    if (modelUrl) {
+      setAnalysisData(null);
+      setShowMarkers(false);
+      setShowImplants(false);
+    }
+  }, [modelUrl]);
 
   const handleDownload = () => {
     if (modelUrl) {

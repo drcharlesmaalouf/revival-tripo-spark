@@ -59,6 +59,12 @@ class AnatomicalAnalyzer {
 
     console.log('Starting anatomical analysis...');
 
+    // Basic validation - check if the model could be human
+    const isValidHumanModel = await this.validateHumanModel(scene);
+    if (!isValidHumanModel) {
+      throw new Error('Model does not appear to be a human torso suitable for anatomical analysis');
+    }
+
     // Extract 2D renders from different angles for analysis
     const frontView = await this.renderModelView(scene, 'front');
     const sideView = await this.renderModelView(scene, 'side');
@@ -74,6 +80,48 @@ class AnatomicalAnalyzer {
       rightBreastMesh: breastMeshes.right,
       landmarks
     };
+  }
+
+  private async validateHumanModel(scene: THREE.Group): Promise<boolean> {
+    // Basic geometric validation for human torso characteristics
+    const boundingBox = new THREE.Box3().setFromObject(scene);
+    const size = boundingBox.getSize(new THREE.Vector3());
+    
+    // Check aspect ratios typical of human torso
+    const aspectRatioYX = size.y / size.x; // Height to width
+    const aspectRatioZX = size.z / size.x; // Depth to width
+    
+    // Human torso typically has these proportions:
+    // - Height should be greater than width (aspect ratio > 1.2)
+    // - Depth should be reasonable compared to width (0.3 < ratio < 0.8)
+    const hasValidAspectRatio = aspectRatioYX > 1.2 && aspectRatioYX < 3.0;
+    const hasValidDepth = aspectRatioZX > 0.3 && aspectRatioZX < 0.8;
+    
+    // Check if model has reasonable complexity (vertex count)
+    let totalVertices = 0;
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.geometry) {
+        const geometry = child.geometry;
+        if (geometry.attributes.position) {
+          totalVertices += geometry.attributes.position.count;
+        }
+      }
+    });
+    
+    // Human models typically have at least 1000 vertices for meaningful anatomy
+    const hasReasonableComplexity = totalVertices > 1000;
+    
+    console.log('Model validation:', {
+      size,
+      aspectRatioYX,
+      aspectRatioZX,
+      totalVertices,
+      hasValidAspectRatio,
+      hasValidDepth,
+      hasReasonableComplexity
+    });
+    
+    return hasValidAspectRatio && hasValidDepth && hasReasonableComplexity;
   }
 
   private async renderModelView(scene: THREE.Group, viewType: 'front' | 'side'): Promise<string> {
