@@ -2,14 +2,14 @@ import { Suspense, useRef, useImperativeHandle, forwardRef, useState, useEffect 
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Environment, Box, useGLTF } from "@react-three/drei";
 import { Mesh } from "three";
-import { Download, RotateCcw, Maximize2, X, Eye, EyeOff } from "lucide-react";
+import { Download, RotateCcw, Maximize2, X, Eye, EyeOff, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { anatomicalAnalyzer, AnatomicalLandmarks, BreastMeshData } from "@/lib/anatomicalAnalysis";
+import { MeshAnalyzerComponent } from "./MeshAnalyzer";
+import { BreastLandmarks } from "@/lib/breastDetection";
+import { AugmentationParameters } from "@/lib/meshManipulation";
 import { MeasurementDisplay } from "./MeasurementDisplay";
 import { ScaleInput } from "./ScaleInput";
-import { AnatomicalMarkers } from "./AnatomicalMarkers";
-import { ImplantMesh } from "./ImplantMesh";
 import * as THREE from "three";
 
 interface ModelViewerProps {
@@ -29,7 +29,13 @@ const PlaceholderModel = () => {
   );
 };
 
-const GeneratedModel = ({ modelUrl }: { modelUrl: string }) => {
+const GeneratedModel = ({ 
+  modelUrl, 
+  onSceneLoaded 
+}: { 
+  modelUrl: string;
+  onSceneLoaded?: (scene: THREE.Group) => void;
+}) => {
   const groupRef = useRef<any>(null);
 
   const shouldUseProxy = !modelUrl.startsWith('blob:') && !modelUrl.startsWith('data:');
@@ -40,6 +46,14 @@ const GeneratedModel = ({ modelUrl }: { modelUrl: string }) => {
   console.log('Loading model:', { original: modelUrl, final: finalUrl, useProxy: shouldUseProxy });
 
   const gltfResult = useGLTF(finalUrl);
+
+  // Notify parent when scene is loaded
+  useEffect(() => {
+    if (gltfResult?.scene && onSceneLoaded) {
+      console.log('Scene loaded, notifying parent');
+      onSceneLoaded(gltfResult.scene);
+    }
+  }, [gltfResult?.scene, onSceneLoaded]);
 
   if (!gltfResult?.scene) {
     console.log('No GLTF scene found - showing green cube fallback');
@@ -67,13 +81,48 @@ const GeneratedModel = ({ modelUrl }: { modelUrl: string }) => {
   );
 };
 
+// Component to display mesh analysis results
+const AnalyzedMesh = ({ 
+  originalMesh,
+  visualizationMesh,
+  augmentedMesh,
+  showVisualization,
+  showAugmented 
+}: {
+  originalMesh: THREE.Mesh;
+  visualizationMesh: THREE.Mesh;
+  augmentedMesh?: THREE.Mesh;
+  showVisualization: boolean;
+  showAugmented: boolean;
+}) => {
+  const meshToShow = showAugmented && augmentedMesh 
+    ? augmentedMesh 
+    : showVisualization 
+      ? visualizationMesh 
+      : originalMesh;
+
+  return (
+    <primitive
+      object={meshToShow}
+      scale={[10, 10, 10]}
+      position={[0, 0, 0]}
+    />
+  );
+};
+
 const Scene = forwardRef<any, { 
   modelUrl?: string; 
-  analysisData?: BreastMeshData | null;
-  showMarkers?: boolean;
-  showImplants?: boolean;
+  meshAnalysisResults?: {
+    originalMesh: THREE.Mesh;
+    landmarks: BreastLandmarks;
+    visualizationMesh: THREE.Mesh;
+    augmentedMesh?: THREE.Mesh;
+  } | null;
+  showVisualization?: boolean;
+  showAugmented?: boolean;
   isFullscreen?: boolean;
-}>(({ modelUrl, analysisData, showMarkers = false, showImplants = false, isFullscreen = false }, ref) => {
+  onSceneLoaded?: (scene: THREE.Group) => void;
+}>(({ modelUrl, meshAnalysisResults, showVisualization = false, showAugmented = false, isFullscreen = false, onSceneLoaded }, ref) => {
   const controlsRef = useRef<any>(null);
 
   useImperativeHandle(ref, () => ({
@@ -90,49 +139,18 @@ const Scene = forwardRef<any, {
       <directionalLight position={[10, 10, 5]} intensity={1} />
       <directionalLight position={[-10, -10, -5]} intensity={0.5} />
 
-      {modelUrl ? (
-        <GeneratedModel modelUrl={modelUrl} />
+      {modelUrl && meshAnalysisResults ? (
+        <AnalyzedMesh 
+          originalMesh={meshAnalysisResults.originalMesh}
+          visualizationMesh={meshAnalysisResults.visualizationMesh}
+          augmentedMesh={meshAnalysisResults.augmentedMesh}
+          showVisualization={showVisualization}
+          showAugmented={showAugmented}
+        />
+      ) : modelUrl ? (
+        <GeneratedModel modelUrl={modelUrl} onSceneLoaded={onSceneLoaded} />
       ) : (
         <PlaceholderModel />
-      )}
-
-      {/* Show marker-based detection instead of mesh modification */}
-      {isFullscreen && showMarkers && analysisData && (
-        <>
-          {console.log('SHOWING DETECTION MARKERS!')}
-          {/* Simple sphere markers for detected areas */}
-          <AnatomicalMarkers 
-            landmarks={analysisData.landmarks} 
-            showMarkers={true} 
-          />
-        </>
-      )}
-
-      {/* Show markers and implants in fullscreen */}
-      {isFullscreen && analysisData && (
-        <>
-          {showMarkers && (
-            <AnatomicalMarkers 
-              landmarks={analysisData.landmarks} 
-              showMarkers={true} 
-            />
-          )}
-          
-          {showImplants && (
-            <>
-              <ImplantMesh 
-                position={anatomicalAnalyzer.getImplantPosition(analysisData.landmarks, 'left')}
-                side="left"
-                visible={true}
-              />
-              <ImplantMesh 
-                position={anatomicalAnalyzer.getImplantPosition(analysisData.landmarks, 'right')}
-                side="right"
-                visible={true}
-              />
-            </>
-          )}
-        </>
       )}
 
       <Environment preset="city" />
@@ -152,85 +170,57 @@ const Scene = forwardRef<any, {
 export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
   const sceneRef = useRef<any>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [loadedScene, setLoadedScene] = useState<THREE.Group | null>(null);
   
-  // Anatomical analysis state
-  const [analysisData, setAnalysisData] = useState<BreastMeshData | null>(null);
-  const [showMarkers, setShowMarkers] = useState(false);
-  const [showImplants, setShowImplants] = useState(false);
-  const [userNippleDistance, setUserNippleDistance] = useState<number | undefined>(undefined);
+  // Mesh analysis state
+  const [meshAnalysisResults, setMeshAnalysisResults] = useState<{
+    originalMesh: THREE.Mesh;
+    landmarks: BreastLandmarks;
+    visualizationMesh: THREE.Mesh;
+    augmentedMesh?: THREE.Mesh;
+  } | null>(null);
+  
+  const [showVisualization, setShowVisualization] = useState(false);
+  const [showAugmented, setShowAugmented] = useState(false);
+  const [augmentationParams] = useState<AugmentationParameters>({
+    implantSize: 300,
+    implantType: 'round',
+    projectionLevel: 'moderate',
+    placementLevel: 'subglandular'
+  });
+  
   const { toast } = useToast();
 
-  const runAnalysis = () => {
-    if (!modelUrl) return;
-    
-    console.log('Running manual analysis...');
-    
-    // Create mock analysis data with coordinates closer to model center
-    const mockData: BreastMeshData = {
-      leftBreastMesh: new THREE.Mesh(),
-      rightBreastMesh: new THREE.Mesh(),
-      landmarks: {
-        leftNipple: new THREE.Vector3(-0.05, 0.02, 0.08),  // Very close to origin
-        rightNipple: new THREE.Vector3(0.05, 0.02, 0.08),
-        leftInframammaryFold: new THREE.Vector3(-0.05, -0.01, 0.07),
-        rightInframammaryFold: new THREE.Vector3(0.05, -0.01, 0.07),
-        leftBreastApex: new THREE.Vector3(-0.05, 0.02, 0.09),
-        rightBreastApex: new THREE.Vector3(0.05, 0.02, 0.09),
-        midChestPoint: new THREE.Vector3(0, 0.02, 0.06),
-        chestWall: [
-          new THREE.Vector3(0, 0.02, 0.06),
-          new THREE.Vector3(-0.08, 0.02, 0.06),
-          new THREE.Vector3(0.08, 0.02, 0.06)
-        ],
-        breastBoundaries: {
-          left: [new THREE.Vector3(-0.05, 0.02, 0.08)],
-          right: [new THREE.Vector3(0.05, 0.02, 0.08)]
-        },
-        measurements: {
-          nippleToNippleDistance: 21,
-          leftBreastWidth: 12,
-          rightBreastWidth: 12,
-          leftBreastHeight: 10,
-          rightBreastHeight: 10,
-          leftBreastProjection: 8,
-          rightBreastProjection: 8,
-          inframammaryFoldWidth: 15,
-          chestWallWidth: 90,
-          averageBreastSize: 'C' as const
-        }
-      },
-      measurements: {
-        nippleToNippleDistance: 21,
-        leftBreastWidth: 12,
-        rightBreastWidth: 12,
-        leftBreastHeight: 10,
-        rightBreastHeight: 10,
-        leftBreastProjection: 8,
-        rightBreastProjection: 8,
-        inframammaryFoldWidth: 15,
-        chestWallWidth: 90,
-        averageBreastSize: 'C' as const
-      },
-      modelScale: 10
-    };
-    
-    setAnalysisData(mockData);
+  // Get the loaded scene from the model
+  useEffect(() => {
+    if (modelUrl) {
+      // This will be populated when the model loads
+      // We need to extract the scene from the GLTF result
+      setLoadedScene(null);
+      setMeshAnalysisResults(null);
+      setShowVisualization(false);
+      setShowAugmented(false);
+    }
+  }, [modelUrl]);
+
+  const handleMeshAnalysisComplete = (results: {
+    originalMesh: THREE.Mesh;
+    landmarks: BreastLandmarks;
+    visualizationMesh: THREE.Mesh;
+    augmentedMesh?: THREE.Mesh;
+  }) => {
+    console.log('Mesh analysis complete:', results);
+    setMeshAnalysisResults(results);
     toast({
-      title: "Analysis Complete",
-      description: "Mock anatomical landmarks generated for testing.",
+      title: "Mesh Analysis Complete",
+      description: "Breast regions detected from mesh geometry.",
     });
   };
 
-  // Clear analysis data when model changes
-  useEffect(() => {
-    console.log('Model URL effect triggered:', { modelUrl, hasAnalysisData: !!analysisData });
-    if (modelUrl) {
-      console.log('Model URL changed, clearing analysis data:', modelUrl);
-      setAnalysisData(null);
-      setShowMarkers(false);
-      setShowImplants(false);
-    }
-  }, [modelUrl]);
+  const handleSceneLoaded = (scene: THREE.Group) => {
+    console.log('Scene loaded in ModelViewer:', scene);
+    setLoadedScene(scene);
+  };
 
   const handleDownload = () => {
     if (modelUrl) {
@@ -273,14 +263,15 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
           style={{ background: "transparent" }}
         >
           <Suspense fallback={null}>
-              <Scene 
-                ref={sceneRef} 
-                modelUrl={modelUrl} 
-                analysisData={analysisData}
-                showMarkers={false}
-                showImplants={false}
-                isFullscreen={false}
-              />
+            <Scene 
+              ref={sceneRef} 
+              modelUrl={modelUrl} 
+              meshAnalysisResults={meshAnalysisResults}
+              showVisualization={false}
+              showAugmented={false}
+              isFullscreen={false}
+              onSceneLoaded={handleSceneLoaded}
+            />
           </Suspense>
         </Canvas>
 
@@ -362,10 +353,11 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                 <Scene 
                   ref={sceneRef} 
                   modelUrl={modelUrl} 
-                  analysisData={analysisData}
-                  showMarkers={showMarkers}
-                  showImplants={showImplants}
+                  meshAnalysisResults={meshAnalysisResults}
+                  showVisualization={showVisualization}
+                  showAugmented={showAugmented}
                   isFullscreen={true}
+                  onSceneLoaded={handleSceneLoaded}
                 />
               </Suspense>
             </Canvas>
@@ -383,25 +375,21 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
               </Button>
 
               <Button
-                variant={showMarkers ? "default" : "secondary"}
+                variant={showVisualization ? "default" : "secondary"}
                 size="sm"
-                onClick={() => {
-                  if (!analysisData) {
-                    runAnalysis();
-                  }
-                  console.log('EYE BUTTON CLICKED! showMarkers:', showMarkers, '-> ', !showMarkers);
-                  setShowMarkers(!showMarkers);
-                }}
+                onClick={() => setShowVisualization(!showVisualization)}
+                disabled={!meshAnalysisResults}
               >
-                {showMarkers ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                {showVisualization ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
               </Button>
 
               <Button
-                variant={showImplants ? "default" : "secondary"}
+                variant={showAugmented ? "default" : "secondary"}
                 size="sm"
-                onClick={() => setShowImplants(!showImplants)}
+                onClick={() => setShowAugmented(!showAugmented)}
+                disabled={!meshAnalysisResults?.augmentedMesh}
               >
-                <span className="w-4 h-4 text-xs font-bold">300</span>
+                <Settings className="w-4 h-4" />
               </Button>
 
               {modelUrl && (
@@ -417,18 +405,26 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
             </div>
           </div>
 
-          {/* Measurement panels - bottom right */}
-          {analysisData && (
+          {/* Mesh Analyzer - hidden component that analyzes when model loads */}
+          {isFullscreen && modelUrl && loadedScene && (
+            <MeshAnalyzerComponent
+              scene={loadedScene}
+              onAnalysisComplete={handleMeshAnalysisComplete}
+              augmentationParams={showAugmented ? augmentationParams : undefined}
+            />
+          )}
+
+          {/* Measurement panels - show when we have analysis results */}
+          {meshAnalysisResults && (
             <div className="absolute bottom-4 right-4 z-60 max-w-sm">
               <div className="space-y-2">
-                <ScaleInput 
-                  onScaleSet={setUserNippleDistance}
-                  currentScale={userNippleDistance}
-                />
-                <MeasurementDisplay 
-                  measurements={analysisData.measurements}
-                  userNippleDistance={userNippleDistance}
-                />
+                <div className="bg-background/95 backdrop-blur-sm rounded-lg p-3 border shadow-lg text-sm">
+                  <h3 className="font-semibold mb-2">Breast Analysis Results</h3>
+                  <p>Left nipple: {meshAnalysisResults.landmarks.leftNipple ? '✓ Detected' : '✗ Not found'}</p>
+                  <p>Right nipple: {meshAnalysisResults.landmarks.rightNipple ? '✓ Detected' : '✗ Not found'}</p>
+                  <p>Left region: {meshAnalysisResults.landmarks.leftBreastRegion?.vertices.length || 0} vertices</p>
+                  <p>Right region: {meshAnalysisResults.landmarks.rightBreastRegion?.vertices.length || 0} vertices</p>
+                </div>
               </div>
             </div>
           )}
