@@ -22,18 +22,34 @@ export interface BreastRegion {
 export class MeshAnalyzer {
   
   static extractMeshData(scene: THREE.Group): THREE.Mesh | null {
+    console.log('=== MESH EXTRACTION DEBUG ===');
+    console.log('Scene:', scene);
+    
     let mainMesh: THREE.Mesh | null = null;
     let maxVertices = 0;
 
     scene.traverse((child) => {
       if (child instanceof THREE.Mesh && child.geometry) {
         const positions = child.geometry.attributes.position;
+        console.log('Found mesh child:', child);
+        console.log('- Geometry:', child.geometry);
+        console.log('- Position count:', positions?.count);
+        console.log('- Material:', child.material);
+        console.log('- Geometry type:', child.geometry.constructor.name);
+        
         if (positions && positions.count > maxVertices) {
           maxVertices = positions.count;
           mainMesh = child;
         }
       }
     });
+
+    if (mainMesh) {
+      console.log('Selected main mesh:');
+      console.log('- Vertices:', maxVertices);
+      console.log('- Geometry integrity check:', mainMesh.geometry.attributes.position ? 'OK' : 'BROKEN');
+      console.log('- Index buffer:', mainMesh.geometry.index ? 'Present' : 'Missing');
+    }
 
     return mainMesh;
   }

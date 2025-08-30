@@ -75,7 +75,20 @@ const GeneratedModel = memo(({
     );
   }
 
-  console.log('Model loaded successfully:', gltfResult, 'Original URL:', modelUrl);
+  console.log('=== GLTF MODEL RENDER DEBUG ===');
+  console.log('GLTF Result:', gltfResult);
+  console.log('Scene:', gltfResult.scene);
+  console.log('Scene children:', gltfResult.scene.children);
+  
+  // Check each child for mesh integrity
+  gltfResult.scene.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      console.log('GLTF Mesh found:', child);
+      console.log('- Geometry:', child.geometry);
+      console.log('- Vertices:', child.geometry.attributes.position?.count);
+      console.log('- Material:', child.material);
+    }
+  });
 
   return (
     <group ref={groupRef}>
@@ -104,15 +117,23 @@ const AnalyzedMesh = ({
   showVisualization: boolean;
   showAugmented: boolean;
 }) => {
-  // Clone the original mesh to prevent any modifications
-  const displayMesh = showAugmented && augmentedMesh 
-    ? augmentedMesh.clone()
-    : originalMesh.clone();
+  console.log('=== ANALYZED MESH RENDER DEBUG ===');
+  console.log('Original mesh:', originalMesh);
+  console.log('- Geometry:', originalMesh.geometry);
+  console.log('- Position count:', originalMesh.geometry.attributes.position?.count);
+  console.log('- Index buffer:', originalMesh.geometry.index);
+  console.log('- Material:', originalMesh.material);
+  
+  // Use the original mesh directly without cloning to avoid any potential issues
+  const meshToDisplay = showAugmented && augmentedMesh ? augmentedMesh : originalMesh;
+  
+  console.log('Mesh to display:', meshToDisplay);
+  console.log('- Will show augmented:', showAugmented && !!augmentedMesh);
 
   return (
     <group>
       <primitive
-        object={displayMesh}
+        object={meshToDisplay}
         scale={[10, 10, 10]}
         position={[0, 0, 0]}
       />
