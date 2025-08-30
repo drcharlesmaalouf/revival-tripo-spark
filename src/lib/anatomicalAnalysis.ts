@@ -56,8 +56,26 @@ class AnatomicalAnalyzer {
     // Perform real 3D mesh analysis
     const vertexAnalysis = this.analyzeMeshGeometry(mainMesh);
     
-    // Detect landmarks based on actual geometry
-    const landmarks = this.detectAnatomicalLandmarks(vertexAnalysis, mainMesh);
+    // Debug the analysis results
+    console.log('=== ANALYSIS DEBUG ===');
+    const nippleCandidates = vertexAnalysis.filter(v => v.isNippleCandidate);
+    const breastVertices = vertexAnalysis.filter(v => v.isBreastRegion);
+    
+    console.log('Total vertices analyzed:', vertexAnalysis.length);
+    console.log('Nipple candidates found:', nippleCandidates.length);
+    console.log('Breast region vertices:', breastVertices.length);
+    
+    // Log nipple candidate positions
+    nippleCandidates.forEach((candidate, idx) => {
+      console.log(`Nipple candidate ${idx + 1}:`, {
+        position: candidate.position,
+        curvature: candidate.curvature,
+        side: candidate.breastSide
+      });
+    });
+
+    // For now, let's create a simple manual detection approach
+    const landmarks = this.createManualLandmarks(mainMesh);
 
     // Create color-coded mesh for visualization
     const analyzedMesh = this.createColorCodedMesh(mainMesh, vertexAnalysis);
@@ -649,6 +667,50 @@ class AnatomicalAnalyzer {
       foldPosition.z + 0.05  // Slightly forward from chest wall
     );
   }
+
+  // Temporary manual landmark detection - more conservative approach
+  private createManualLandmarks(mesh: THREE.Mesh): AnatomicalLandmarks {
+    const boundingBox = new THREE.Box3().setFromObject(mesh);
+    const center = boundingBox.getCenter(new THREE.Vector3());
+    const size = boundingBox.getSize(new THREE.Vector3());
+    
+    console.log('Manual landmark creation:', { center, size });
+    
+    // More conservative nipple positioning - closer to center
+    const nippleHeight = center.y + size.y * 0.1; // Slightly above center
+    const nippleForward = center.z + size.z * 0.3; // Not too far forward
+    const nippleSpacing = size.x * 0.15; // Closer spacing
+    
+    const landmarks: AnatomicalLandmarks = {
+      leftNipple: new THREE.Vector3(center.x - nippleSpacing, nippleHeight, nippleForward),
+      rightNipple: new THREE.Vector3(center.x + nippleSpacing, nippleHeight, nippleForward),
+      
+      leftInframammaryFold: new THREE.Vector3(center.x - nippleSpacing, center.y - size.y * 0.1, center.z),
+      rightInframammaryFold: new THREE.Vector3(center.x + nippleSpacing, center.y - size.y * 0.1, center.z),
+      
+      leftBreastApex: new THREE.Vector3(center.x - nippleSpacing, nippleHeight, nippleForward),
+      rightBreastApex: new THREE.Vector3(center.x + nippleSpacing, nippleHeight, nippleForward),
+      
+      midChestPoint: new THREE.Vector3(center.x, center.y, center.z - size.z * 0.1),
+      
+      chestWall: [
+        new THREE.Vector3(center.x, center.y, center.z - size.z * 0.1),
+        new THREE.Vector3(center.x - size.x * 0.2, center.y, center.z - size.z * 0.1),
+        new THREE.Vector3(center.x + size.x * 0.2, center.y, center.z - size.z * 0.1)
+      ],
+      
+      breastBoundaries: {
+        left: this.generateBreastBoundary(center, size, 'left'),
+        right: this.generateBreastBoundary(center, size, 'right')
+      },
+      
+      measurements: {} as BreastMeasurements
+    };
+    
+    console.log('Created manual landmarks:', landmarks);
+    return landmarks;
+  }
 }
+
 
 export const anatomicalAnalyzer = new AnatomicalAnalyzer();
