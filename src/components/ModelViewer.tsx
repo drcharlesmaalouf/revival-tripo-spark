@@ -6,7 +6,7 @@ import { Download, RotateCcw, Maximize2, X, Eye, EyeOff, Settings } from "lucide
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { MeshAnalyzerComponent } from "./MeshAnalyzer";
-import { BreastLandmarks } from "@/lib/breastDetection";
+import { BreastLandmarks, BreastDetector } from "@/lib/breastDetection";
 import { AugmentationParameters } from "@/lib/meshManipulation";
 import { MeasurementDisplay } from "./MeasurementDisplay";
 import { ScaleInput } from "./ScaleInput";
@@ -93,27 +93,36 @@ const AnalyzedMesh = ({
   originalMesh,
   visualizationMesh,
   augmentedMesh,
+  landmarks,
   showVisualization,
   showAugmented 
 }: {
   originalMesh: THREE.Mesh;
   visualizationMesh: THREE.Mesh;
   augmentedMesh?: THREE.Mesh;
+  landmarks: BreastLandmarks;
   showVisualization: boolean;
   showAugmented: boolean;
 }) => {
   const meshToShow = showAugmented && augmentedMesh 
     ? augmentedMesh 
-    : showVisualization 
-      ? visualizationMesh 
-      : originalMesh;
+    : originalMesh; // Always use original mesh, not the visualization mesh
 
   return (
-    <primitive
-      object={meshToShow}
-      scale={[10, 10, 10]}
-      position={[0, 0, 0]}
-    />
+    <group>
+      <primitive
+        object={meshToShow}
+        scale={[10, 10, 10]}
+        position={[0, 0, 0]}
+      />
+      {showVisualization && landmarks && (
+        <primitive
+          object={BreastDetector.createVisualizationMarkers(landmarks)}
+          scale={[10, 10, 10]}
+          position={[0, 0, 0]}
+        />
+      )}
+    </group>
   );
 };
 
@@ -151,6 +160,7 @@ const Scene = forwardRef<any, {
           originalMesh={meshAnalysisResults.originalMesh}
           visualizationMesh={meshAnalysisResults.visualizationMesh}
           augmentedMesh={meshAnalysisResults.augmentedMesh}
+          landmarks={meshAnalysisResults.landmarks}
           showVisualization={showVisualization}
           showAugmented={showAugmented}
         />

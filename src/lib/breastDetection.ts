@@ -259,58 +259,91 @@ export class BreastDetector {
     originalMesh: THREE.Mesh,
     landmarks: BreastLandmarks
   ): THREE.Mesh {
-    // Clone the original mesh
-    const visualMesh = originalMesh.clone();
-    const geometry = visualMesh.geometry.clone();
-    
-    // Create color attribute for visualization
-    const positions = geometry.attributes.position;
-    const colors = new Float32Array(positions.count * 3);
-    
-    // Default color (light gray)
-    for (let i = 0; i < positions.count; i++) {
-      colors[i * 3] = 0.8;     // R
-      colors[i * 3 + 1] = 0.8; // G
-      colors[i * 3 + 2] = 0.8; // B
+    // Don't modify the original mesh - just return it as-is
+    // We'll add visualization markers separately in the ModelViewer
+    return originalMesh.clone();
+  }
+
+  static createVisualizationMarkers(landmarks: BreastLandmarks): THREE.Group {
+    const markersGroup = new THREE.Group();
+    markersGroup.name = 'BreastMarkers';
+
+    // Create nipple markers
+    if (landmarks.leftNipple) {
+      const leftMarker = new THREE.Mesh(
+        new THREE.SphereGeometry(0.02, 16, 16),
+        new THREE.MeshStandardMaterial({ 
+          color: 0xff1493, // Deep pink
+          emissive: 0x441144,
+          transparent: true,
+          opacity: 0.8
+        })
+      );
+      leftMarker.position.copy(landmarks.leftNipple);
+      leftMarker.name = 'LeftNipple';
+      markersGroup.add(leftMarker);
     }
+
+    if (landmarks.rightNipple) {
+      const rightMarker = new THREE.Mesh(
+        new THREE.SphereGeometry(0.02, 16, 16),
+        new THREE.MeshStandardMaterial({ 
+          color: 0x1e90ff, // Deep sky blue
+          emissive: 0x114444,
+          transparent: true,
+          opacity: 0.8
+        })
+      );
+      rightMarker.position.copy(landmarks.rightNipple);
+      rightMarker.name = 'RightNipple';
+      markersGroup.add(rightMarker);
+    }
+
+    // Create region boundary markers
+    if (landmarks.leftBreastRegion) {
+      const leftRegionMarkers = this.createRegionMarkers(
+        landmarks.leftBreastRegion, 
+        0xff69b4 // Hot pink
+      );
+      leftRegionMarkers.name = 'LeftRegion';
+      markersGroup.add(leftRegionMarkers);
+    }
+
+    if (landmarks.rightBreastRegion) {
+      const rightRegionMarkers = this.createRegionMarkers(
+        landmarks.rightBreastRegion, 
+        0x4169e1 // Royal blue
+      );
+      rightRegionMarkers.name = 'RightRegion';
+      markersGroup.add(rightRegionMarkers);
+    }
+
+    return markersGroup;
+  }
+
+  private static createRegionMarkers(region: BreastRegion, color: number): THREE.Group {
+    const regionGroup = new THREE.Group();
     
-    // Color breast regions - check if index exists in the geometry
-    const colorRegion = (region: BreastRegion | null, color: [number, number, number]) => {
-      if (!region) return;
+    // Sample a few vertices from the region to show as small markers
+    const sampleSize = Math.min(5, region.vertices.length);
+    const step = Math.floor(region.vertices.length / sampleSize);
+    
+    for (let i = 0; i < region.vertices.length; i += step) {
+      if (regionGroup.children.length >= sampleSize) break;
       
-      let coloredCount = 0;
-      region.vertices.forEach(vertex => {
-        const idx = vertex.index;
-        // Ensure the index is valid for the current geometry
-        if (idx >= 0 && idx < positions.count) {
-          colors[idx * 3] = color[0];
-          colors[idx * 3 + 1] = color[1];
-          colors[idx * 3 + 2] = color[2];
-          coloredCount++;
-        }
-      });
-      
-      console.log(`Colored ${coloredCount} vertices for region with ${region.vertices.length} total vertices`);
-    };
-    
-    // Color left breast pink, right breast blue
-    colorRegion(landmarks.leftBreastRegion, [1.0, 0.4, 0.7]);  // More vibrant pink
-    colorRegion(landmarks.rightBreastRegion, [0.3, 0.6, 1.0]); // More vibrant blue
-    
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    
-    // Create material with vertex colors and proper settings
-    const material = new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      side: THREE.DoubleSide,
-      wireframe: false,
-      transparent: false,
-      opacity: 1.0
-    });
-    
-    visualMesh.material = material;
-    visualMesh.geometry = geometry;
-    
-    return visualMesh;
+      const vertex = region.vertices[i];
+      const marker = new THREE.Mesh(
+        new THREE.SphereGeometry(0.008, 8, 8),
+        new THREE.MeshStandardMaterial({ 
+          color: color,
+          transparent: true,
+          opacity: 0.6
+        })
+      );
+      marker.position.copy(vertex.position);
+      regionGroup.add(marker);
+    }
+
+    return regionGroup;
   }
 }
