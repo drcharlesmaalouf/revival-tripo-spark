@@ -396,8 +396,33 @@ class AnatomicalAnalyzer {
   private createColorCodedMesh(originalMesh: THREE.Mesh, vertexAnalysis: VertexAnalysis[]): THREE.Mesh {
     console.log('Creating color-coded mesh for visualization...');
     
+    // Clone the geometry properly to preserve structure
     const geometry = originalMesh.geometry.clone();
     const vertexCount = geometry.attributes.position.count;
+    
+    console.log('Mesh analysis:', {
+      vertexCount,
+      analysisLength: vertexAnalysis.length,
+      hasNormals: !!geometry.attributes.normal,
+      hasUVs: !!geometry.attributes.uv
+    });
+    
+    // Ensure we have matching analysis data
+    if (vertexAnalysis.length !== vertexCount) {
+      console.warn('Vertex count mismatch! Expected:', vertexCount, 'Got:', vertexAnalysis.length);
+      
+      // Pad analysis with safe defaults if needed
+      while (vertexAnalysis.length < vertexCount) {
+        vertexAnalysis.push({
+          position: new THREE.Vector3(),
+          normal: new THREE.Vector3(0, 0, 1),
+          curvature: 0,
+          isBreastRegion: false,
+          isNippleCandidate: false,
+          breastSide: undefined
+        });
+      }
+    }
     
     // Create color attribute for vertices
     const colors = new Float32Array(vertexCount * 3);
@@ -406,11 +431,11 @@ class AnatomicalAnalyzer {
       const analysis = vertexAnalysis[i];
       let r = 0.7, g = 0.7, b = 0.7; // Default gray
       
-      if (analysis.isNippleCandidate) {
+      if (analysis && analysis.isNippleCandidate) {
         // Nipples in bright red
         r = 1.0; g = 0.0; b = 0.0;
-      } else if (analysis.isBreastRegion) {
-        // Breast regions in pink/salmon
+      } else if (analysis && analysis.isBreastRegion) {
+        // Breast regions in different colors
         if (analysis.breastSide === 'left') {
           r = 1.0; g = 0.6; b = 0.8; // Light pink for left
         } else {
@@ -425,16 +450,22 @@ class AnatomicalAnalyzer {
     
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     
-    // Create material that uses vertex colors
+    // Create material that preserves the mesh structure
     const material = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      side: THREE.DoubleSide
+      side: THREE.DoubleSide,
+      transparent: false,
+      wireframe: false
     });
     
+    // Create the mesh with exact same transforms
     const colorCodedMesh = new THREE.Mesh(geometry, material);
     colorCodedMesh.position.copy(originalMesh.position);
     colorCodedMesh.rotation.copy(originalMesh.rotation);
     colorCodedMesh.scale.copy(originalMesh.scale);
+    colorCodedMesh.matrixAutoUpdate = originalMesh.matrixAutoUpdate;
+    
+    console.log('Color-coded mesh created successfully');
     
     return colorCodedMesh;
   }

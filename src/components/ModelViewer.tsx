@@ -448,23 +448,16 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
         )}
       </div>
 
-      {/* Fullscreen draggable & resizable window */}
+          {/* Fullscreen draggable & resizable window */}
       {isFullscreen && (
         <>
           {/* Background overlay */}
           <div className="fixed inset-0 bg-black/20 z-40" onClick={closeFullscreen} />
 
-          {/* Draggable & resizable window */}
+          {/* Fullscreen window - occupy entire screen */}
           <div
             ref={windowRef}
-            className="fixed z-50 bg-background border border-border rounded-lg shadow-2xl overflow-hidden"
-            style={{
-              left: windowPosition.x,
-              top: windowPosition.y,
-              width: windowSize.width,
-              height: windowSize.height,
-              cursor: isDragging ? 'move' : isResizing ? 'nw-resize' : 'default',
-            }}
+            className="fixed inset-0 z-50 bg-background overflow-hidden"
           >
             {/* Window header */}
             <div
@@ -488,8 +481,8 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
               </Button>
             </div>
 
-            {/* Window content */}
-            <div className="relative bg-gradient-secondary" style={{ height: windowSize.height - 48 }}>
+            {/* Window content - full height */}
+            <div className="relative bg-gradient-secondary h-full">
               <Canvas
                 camera={{ 
                   position: [1, 0.5, 1], 
@@ -568,9 +561,9 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                 )}
               </div>
 
-              {/* Measurement Display in fullscreen - top right */}
+              {/* Measurement Display in fullscreen - bottom right */}
               {analysisData && (
-                <div className="absolute top-12 right-2 max-w-sm">
+                <div className="absolute bottom-16 right-4 max-w-sm">
                   <div className="space-y-2">
                     <ScaleInput 
                       onScaleSet={setUserNippleDistance}
@@ -583,24 +576,24 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                     
                     {/* Color legend for analysis visualization */}
                     {analysisData.analyzedMesh && (
-                      <div className="bg-white/90 backdrop-blur-sm rounded-lg p-3 text-sm">
-                        <h4 className="font-semibold mb-2">Breast Detection Analysis</h4>
+                      <div className="bg-background/90 backdrop-blur-sm rounded-lg p-3 text-sm border border-border">
+                        <h4 className="font-semibold mb-2 text-foreground">Breast Detection Analysis</h4>
                         <div className="space-y-1 text-xs">
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                            <span>Nipples detected</span>
+                            <span className="text-muted-foreground">Nipples detected</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 bg-pink-400 rounded-full"></div>
-                            <span>Left breast region</span>
+                            <span className="text-muted-foreground">Left breast region</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 bg-purple-400 rounded-full"></div>
-                            <span>Right breast region</span>
+                            <span className="text-muted-foreground">Right breast region</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
-                            <span>Other areas</span>
+                            <span className="text-muted-foreground">Other areas</span>
                           </div>
                         </div>
                       </div>
