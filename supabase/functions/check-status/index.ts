@@ -56,7 +56,7 @@ serve(async (req) => {
       JSON.stringify({ 
         status: taskData.status,
         progress: taskData.progress,
-        model_url: taskData.output?.model || taskData.result?.model || taskData.model || null,
+        model_url: taskData.output?.model || taskData.output?.result?.model || taskData.result?.model || taskData.model_url || taskData.download_url || null,
         error: taskData.error || null,
         success: true 
       }),
