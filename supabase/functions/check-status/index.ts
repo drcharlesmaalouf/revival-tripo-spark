@@ -47,11 +47,16 @@ serve(async (req) => {
     const result = await response.json()
     const taskData = result.data
     
+    console.log('Tripo API response:', JSON.stringify(result, null, 2))
+    console.log('Task data:', JSON.stringify(taskData, null, 2))
+    console.log('Task status:', taskData.status)
+    console.log('Task output:', JSON.stringify(taskData.output, null, 2))
+    
     return new Response(
       JSON.stringify({ 
         status: taskData.status,
         progress: taskData.progress,
-        model_url: taskData.output?.model || null,
+        model_url: taskData.output?.model || taskData.result?.model || taskData.model || null,
         error: taskData.error || null,
         success: true 
       }),
