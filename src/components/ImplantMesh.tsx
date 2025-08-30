@@ -8,21 +8,24 @@ interface ImplantMeshProps {
   visible?: boolean;
 }
 
-// Generic 300cc implant: 12cm diameter, 4cm projection (properly scaled for model)
+// Fixed implant sizing based on real measurements
+// If nipple-to-nipple is 21cm and implant circumference is 12cm:
+// - Implant diameter = 12cm / π = ~3.8cm  
+// - Making implant much smaller to be proportional to body
 const IMPLANT_SPECS = {
-  diameter: 0.12, // 12cm - realistic size relative to human body
-  projection: 0.04, // 4cm - realistic projection
+  diameter: 0.038, // 3.8cm diameter - correctly sized 
+  projection: 0.02, // 2cm projection - realistic
   volume: 300 // cc
 };
 
 export const ImplantMesh = ({ position, side, visible = true }: ImplantMeshProps) => {
   const meshRef = useRef<Mesh>(null);
 
-  // Create implant geometry - slightly flattened sphere for realistic shape
+  // Create implant geometry - much smaller, realistic size
   const implantGeometry = new THREE.SphereGeometry(
-    IMPLANT_SPECS.diameter / 2, // radius
-    32, // width segments
-    16  // height segments
+    IMPLANT_SPECS.diameter / 2, // radius - now correctly sized
+    16, // width segments - reduced for performance
+    12  // height segments - reduced for performance
   );
 
   // Flatten the bottom slightly and adjust projection

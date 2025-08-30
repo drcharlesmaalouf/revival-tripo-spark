@@ -431,18 +431,26 @@ class AnatomicalAnalyzer {
   private createColorCodedMesh(originalMesh: THREE.Mesh, vertexAnalysis: VertexAnalysis[]): THREE.Mesh {
     console.log('Creating color-coded mesh for visualization...');
     
-    // Clone the geometry properly to preserve structure
-    const geometry = originalMesh.geometry.clone();
+    // CRITICAL: Clone the original mesh completely to preserve structure
+    const clonedMesh = originalMesh.clone();
+    const geometry = clonedMesh.geometry.clone();
+    
+    // Make sure geometry is properly updated
+    geometry.computeBoundingSphere();
+    geometry.computeBoundingBox();
+    
     const vertexCount = geometry.attributes.position.count;
     
     console.log('Mesh analysis:', {
       vertexCount,
       analysisLength: vertexAnalysis.length,
       hasNormals: !!geometry.attributes.normal,
-      hasUVs: !!geometry.attributes.uv
+      hasUVs: !!geometry.attributes.uv,
+      originalPosition: originalMesh.position,
+      originalScale: originalMesh.scale
     });
     
-    // Ensure we have matching analysis data
+    // Ensure vertex analysis matches vertex count
     if (vertexAnalysis.length !== vertexCount) {
       console.warn('Vertex count mismatch! Expected:', vertexCount, 'Got:', vertexAnalysis.length);
       
@@ -464,11 +472,11 @@ class AnatomicalAnalyzer {
     
     for (let i = 0; i < vertexCount; i++) {
       const analysis = vertexAnalysis[i];
-      let r = 0.7, g = 0.7, b = 0.7; // Default gray
+      let r = 0.8, g = 0.8, b = 0.8; // Light gray default
       
       if (analysis && analysis.isNippleCandidate) {
         // Nipples in bright red
-        r = 1.0; g = 0.0; b = 0.0;
+        r = 1.0; g = 0.2; b = 0.2;
       } else if (analysis && analysis.isBreastRegion) {
         // Breast regions in different colors
         if (analysis.breastSide === 'left') {
@@ -493,12 +501,13 @@ class AnatomicalAnalyzer {
       wireframe: false
     });
     
-    // Create the mesh with exact same transforms
+    // Create the mesh with EXACT same transforms
     const colorCodedMesh = new THREE.Mesh(geometry, material);
     colorCodedMesh.position.copy(originalMesh.position);
     colorCodedMesh.rotation.copy(originalMesh.rotation);
     colorCodedMesh.scale.copy(originalMesh.scale);
-    colorCodedMesh.matrixAutoUpdate = originalMesh.matrixAutoUpdate;
+    colorCodedMesh.matrix.copy(originalMesh.matrix);
+    colorCodedMesh.matrixWorld.copy(originalMesh.matrixWorld);
     
     console.log('Color-coded mesh created successfully with', vertexCount, 'vertices');
     console.log('Mesh details:', {
