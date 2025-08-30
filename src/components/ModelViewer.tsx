@@ -542,12 +542,24 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                 </Button>
 
                 {/* Analysis controls - only in fullscreen */}
+                {(() => {
+                  console.log('Rendering fullscreen controls:', { 
+                    modelUrl: !!modelUrl, 
+                    analysisData: !!analysisData,
+                    showingEyeButton: !!(modelUrl && analysisData)
+                  });
+                  return null;
+                })()}
+                
                 {modelUrl && analysisData && (
                   <>
                     <Button
                       variant={showMarkers ? "default" : "secondary"}
                       size="sm"
-                      onClick={() => setShowMarkers(!showMarkers)}
+                      onClick={() => {
+                        console.log('Eye button clicked, toggling showMarkers from', showMarkers, 'to', !showMarkers);
+                        setShowMarkers(!showMarkers);
+                      }}
                       className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
                       title="Toggle detection visualization"
                     >
