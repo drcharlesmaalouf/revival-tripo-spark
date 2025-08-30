@@ -77,23 +77,49 @@ const GeneratedModel = memo(({
 
   console.log('=== GLTF MODEL RENDER DEBUG ===');
   console.log('GLTF Result:', gltfResult);
-  console.log('Scene:', gltfResult.scene);
-  console.log('Scene children:', gltfResult.scene.children);
   
-  // Check each child for mesh integrity
-  gltfResult.scene.traverse((child) => {
+  // Fix potential material/geometry issues
+  const clonedScene = gltfResult.scene.clone();
+  clonedScene.traverse((child) => {
     if (child instanceof THREE.Mesh) {
-      console.log('GLTF Mesh found:', child);
-      console.log('- Geometry:', child.geometry);
+      console.log('Processing mesh:', child);
       console.log('- Vertices:', child.geometry.attributes.position?.count);
-      console.log('- Material:', child.material);
+      console.log('- Has index:', !!child.geometry.index);
+      console.log('- Material type:', child.material?.constructor.name);
+      
+      // Ensure geometry has proper indices for solid rendering
+      if (!child.geometry.index) {
+        console.log('Adding missing index buffer');
+        const indices = [];
+        const positions = child.geometry.attributes.position;
+        for (let i = 0; i < positions.count; i += 3) {
+          indices.push(i, i + 1, i + 2);
+        }
+        child.geometry.setIndex(indices);
+      }
+      
+      // Ensure proper material for solid rendering
+      if (child.material) {
+        if (Array.isArray(child.material)) {
+          child.material = child.material.map(mat => {
+            const newMat = mat.clone();
+            newMat.wireframe = false;
+            newMat.side = THREE.DoubleSide;
+            return newMat;
+          });
+        } else {
+          child.material = child.material.clone();
+          child.material.wireframe = false;
+          child.material.side = THREE.DoubleSide;
+        }
+      }
     }
   });
 
   return (
     <group ref={groupRef}>
       <primitive
-        object={gltfResult.scene.clone()}
+        object={clonedScene}
         scale={[10, 10, 10]}
         position={[0, 0, 0]}
       />
