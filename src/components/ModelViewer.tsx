@@ -165,26 +165,26 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
     
     console.log('Running manual analysis...');
     
-    // Create mock analysis data with correct positioning for the scaled model
+    // Create mock analysis data with coordinates closer to model center
     const mockData: BreastMeshData = {
       leftBreastMesh: new THREE.Mesh(),
       rightBreastMesh: new THREE.Mesh(),
       landmarks: {
-        leftNipple: new THREE.Vector3(-1.05, 1.5, 4.0),  // Scaled for 10x model
-        rightNipple: new THREE.Vector3(1.05, 1.5, 4.0),
-        leftInframammaryFold: new THREE.Vector3(-1.05, 0.5, 3.5),
-        rightInframammaryFold: new THREE.Vector3(1.05, 0.5, 3.5),
-        leftBreastApex: new THREE.Vector3(-1.05, 1.5, 4.5),
-        rightBreastApex: new THREE.Vector3(1.05, 1.5, 4.5),
-        midChestPoint: new THREE.Vector3(0, 1.5, 3.0),
+        leftNipple: new THREE.Vector3(-0.3, 0.2, 0.8),  // Much closer to model
+        rightNipple: new THREE.Vector3(0.3, 0.2, 0.8),
+        leftInframammaryFold: new THREE.Vector3(-0.3, -0.1, 0.7),
+        rightInframammaryFold: new THREE.Vector3(0.3, -0.1, 0.7),
+        leftBreastApex: new THREE.Vector3(-0.3, 0.2, 0.9),
+        rightBreastApex: new THREE.Vector3(0.3, 0.2, 0.9),
+        midChestPoint: new THREE.Vector3(0, 0.2, 0.6),
         chestWall: [
-          new THREE.Vector3(0, 1.5, 3.0),
-          new THREE.Vector3(-2.0, 1.5, 3.0),
-          new THREE.Vector3(2.0, 1.5, 3.0)
+          new THREE.Vector3(0, 0.2, 0.6),
+          new THREE.Vector3(-0.5, 0.2, 0.6),
+          new THREE.Vector3(0.5, 0.2, 0.6)
         ],
         breastBoundaries: {
-          left: [new THREE.Vector3(-1.05, 1.5, 4.0)],
-          right: [new THREE.Vector3(1.05, 1.5, 4.0)]
+          left: [new THREE.Vector3(-0.3, 0.2, 0.8)],
+          right: [new THREE.Vector3(0.3, 0.2, 0.8)]
         },
         measurements: {
           nippleToNippleDistance: 21,
