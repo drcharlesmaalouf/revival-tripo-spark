@@ -200,6 +200,18 @@ const Index = () => {
     });
   };
 
+  const handleCancelGeneration = () => {
+    setGeneration({
+      isGenerating: false,
+      progress: 0,
+      error: undefined,
+    });
+    toast({
+      title: "Generation Cancelled",
+      description: "3D model generation has been cancelled.",
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5">
       {/* Header */}
@@ -289,6 +301,7 @@ const Index = () => {
                   progress={generation.progress}
                   taskId={generation.taskId}
                   error={generation.error}
+                  onCancel={handleCancelGeneration}
                 />
               )}
             </div>

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
-import { Loader2, Sparkles, CheckCircle2, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, Sparkles, CheckCircle2, AlertCircle, X } from "lucide-react";
 
 interface GenerationProgressProps {
   isGenerating: boolean;
@@ -9,6 +10,7 @@ interface GenerationProgressProps {
   taskId?: string;
   error?: string;
   onComplete?: (modelUrl: string) => void;
+  onCancel?: () => void;
 }
 
 export const GenerationProgress = ({ 
@@ -16,7 +18,8 @@ export const GenerationProgress = ({
   progress, 
   taskId, 
   error,
-  onComplete 
+  onComplete,
+  onCancel
 }: GenerationProgressProps) => {
   const [displayProgress, setDisplayProgress] = useState(0);
   const [stage, setStage] = useState<'uploading' | 'processing' | 'finalizing' | 'complete' | 'error'>('uploading');
@@ -106,6 +109,18 @@ export const GenerationProgress = ({
           <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
             <p className="text-sm text-destructive">{error}</p>
           </div>
+        )}
+
+        {isGenerating && onCancel && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onCancel}
+            className="w-full"
+          >
+            <X className="h-4 w-4 mr-2" />
+            Cancel Generation
+          </Button>
         )}
 
         <div className="text-xs text-muted-foreground text-center">
