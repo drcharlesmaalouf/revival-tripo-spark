@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,16 @@ export const ApiKeyInput = ({ onValidation }: ApiKeyInputProps) => {
   const [isValidating, setIsValidating] = useState(false);
   const [validationState, setValidationState] = useState<'idle' | 'valid' | 'invalid'>('idle');
   const { toast } = useToast();
+
+  // Check for stored API key on component mount
+  useEffect(() => {
+    const storedKey = localStorage.getItem('tripoai_api_key');
+    if (storedKey) {
+      setApiKey(storedKey);
+      setValidationState('valid');
+      onValidation(storedKey, true);
+    }
+  }, [onValidation]);
 
   const validateApiKey = async () => {
     if (!apiKey.trim()) {
