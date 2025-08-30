@@ -23,6 +23,8 @@ serve(async (req) => {
       )
     }
 
+    console.log('Starting generation with image_token:', image_token)
+    
     // Start 3D generation with Tripo API
     const response = await fetch('https://api.tripo3d.ai/v2/openapi/task', {
       method: 'POST',
@@ -32,7 +34,10 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         type: 'image_to_model',
-        image_token: image_token,
+        file: {
+          type: 'jpg',
+          file_token: image_token
+        }
       }),
     })
 
