@@ -50,33 +50,34 @@ const GeneratedModel = ({
 
   const gltfResult = useGLTF(finalUrl);
 
-  // Perform anatomical analysis - FIXED DEPENDENCIES
+  // Perform anatomical analysis - STOP INFINITE LOOP
   useEffect(() => {
-    const modelAlreadyAnalyzed = analyzedModelUrl === finalUrl;
+    if (!gltfResult?.scene || isAnalyzing || !onAnalysisComplete) return;
     
-    if (gltfResult?.scene && !isAnalyzing && !modelAlreadyAnalyzed && onAnalysisComplete) {
-      console.log('Starting anatomical analysis for model...');
-      setIsAnalyzing(true);
-      setAnalyzedModelUrl(finalUrl);
-      
-      anatomicalAnalyzer.analyzeModel(gltfResult.scene)
-        .then((analysisData) => {
-          console.log('Anatomical analysis complete:', analysisData);
-          onAnalysisComplete(analysisData);
-        })
-        .catch((error) => {
-          console.error('Anatomical analysis failed:', error);
-          toast({
-            variant: "destructive",
-            title: "Analysis Failed",
-            description: error.message || "Model does not appear suitable for anatomical analysis.",
-          });
-        })
-        .finally(() => {
-          setIsAnalyzing(false);
+    // Only analyze if we haven't analyzed this exact URL yet
+    if (analyzedModelUrl === finalUrl) return;
+    
+    console.log('Starting anatomical analysis for model...');
+    setIsAnalyzing(true);
+    setAnalyzedModelUrl(finalUrl);
+    
+    anatomicalAnalyzer.analyzeModel(gltfResult.scene)
+      .then((analysisData) => {
+        console.log('Anatomical analysis complete:', analysisData);
+        onAnalysisComplete(analysisData);
+      })
+      .catch((error) => {
+        console.error('Anatomical analysis failed:', error);
+        toast({
+          variant: "destructive",
+          title: "Analysis Failed",
+          description: error.message || "Model does not appear suitable for anatomical analysis.",
         });
-    }
-  }, [finalUrl]); // ONLY finalUrl dependency to avoid loops
+      })
+      .finally(() => {
+        setIsAnalyzing(false);
+      });
+  }, [gltfResult?.scene, finalUrl, onAnalysisComplete]); // MINIMAL dependencies
 
   if (!gltfResult?.scene) {
     console.log('No GLTF scene found - showing green cube fallback');

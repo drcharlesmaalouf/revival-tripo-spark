@@ -230,9 +230,12 @@ class AnatomicalAnalyzer {
       // Determine if this vertex is in breast region
       const isBreastRegion = this.isInBreastRegion(position, center, size);
       
-      // Check if this could be a nipple (high curvature + forward position + breast region)
-      const isNippleCandidate = isBreastRegion && curvature > 0.8 && 
-        position.z > center.z + size.z * 0.2; // Forward-most 20%
+      // Check if this could be a nipple - MUCH MORE RESTRICTIVE
+      const isNippleCandidate = isBreastRegion && 
+        curvature > 0.85 && // Higher curvature threshold
+        position.z > center.z + size.z * 0.3 && // Must be well forward
+        position.y > center.y + size.y * 0.15 && // Must be in upper chest area
+        position.y < center.y + size.y * 0.35; // But not too high
       
       // Determine breast side
       let breastSide: 'left' | 'right' | undefined;
@@ -301,21 +304,25 @@ class AnatomicalAnalyzer {
   }
 
   private isInBreastRegion(position: THREE.Vector3, center: THREE.Vector3, size: THREE.Vector3): boolean {
-    // Define breast region based on anatomical positioning
+    // Define breast region based on anatomical positioning - MUCH MORE RESTRICTIVE
     const relativePos = position.clone().sub(center);
     
-    // Breast region criteria:
-    // 1. Forward portion of torso (positive Z)
-    // 2. Upper chest area (positive Y, but not too high)
-    // 3. Left and right sides (not center)
-    // 4. Reasonable distance from center
+    // Breast region criteria - ONLY upper chest:
+    // 1. Upper torso only (above center, not below)
+    const isUpperTorso = relativePos.y > -size.y * 0.2; // Only upper 80% of model
     
-    const isForward = relativePos.z > size.z * 0.1; // Forward 10% of model
-    const isUpperChest = relativePos.y > -size.y * 0.3 && relativePos.y < size.y * 0.3;
-    const isNotCenter = Math.abs(relativePos.x) > size.x * 0.05; // Not in center 10%
-    const isReasonableDistance = Math.abs(relativePos.x) < size.x * 0.4; // Within 40% of center
+    // 2. Forward portion of torso (positive Z)
+    const isForward = relativePos.z > 0;
     
-    return isForward && isUpperChest && isNotCenter && isReasonableDistance;
+    // 3. Lateral positioning (not center, but not at edges)
+    const isLateralLeft = relativePos.x < -size.x * 0.05 && relativePos.x > -size.x * 0.4;
+    const isLateralRight = relativePos.x > size.x * 0.05 && relativePos.x < size.x * 0.4;
+    const isLateral = isLateralLeft || isLateralRight;
+    
+    // 4. Chest level (around upper-middle torso)
+    const isChestLevel = relativePos.y > size.y * 0.1 && relativePos.y < size.y * 0.4;
+    
+    return isUpperTorso && isForward && isLateral && isChestLevel;
   }
 
   private detectAnatomicalLandmarks(vertexAnalysis: VertexAnalysis[], mesh: THREE.Mesh): AnatomicalLandmarks {
