@@ -174,15 +174,25 @@ export class MeshAnalyzer {
     return neighbors;
   }
 
-  static createCurvatureMap(vertices: MeshVertex[], geometry: THREE.BufferGeometry): Map<number, CurvatureData> {
+  static async createCurvatureMap(vertices: MeshVertex[], geometry: THREE.BufferGeometry): Promise<Map<number, CurvatureData>> {
     const curvatureMap = new Map<number, CurvatureData>();
     
     console.log(`Calculating curvature for ${vertices.length} vertices...`);
     
-    // Process in batches to avoid blocking the UI
-    const batchSize = 1000;
-    for (let i = 0; i < vertices.length; i += batchSize) {
-      const batch = vertices.slice(i, i + batchSize);
+    // For performance, sample vertices if too many
+    const maxVertices = 10000;
+    const sampledVertices = vertices.length > maxVertices 
+      ? this.sampleVertices(vertices, maxVertices)
+      : vertices;
+    
+    console.log(`Processing ${sampledVertices.length} sampled vertices for curvature...`);
+    
+    // Process in small batches with async breaks to avoid blocking UI
+    const batchSize = 100;
+    let processed = 0;
+    
+    for (let i = 0; i < sampledVertices.length; i += batchSize) {
+      const batch = sampledVertices.slice(i, i + batchSize);
       
       for (const vertex of batch) {
         const neighborIndices = this.findNeighbors(vertex.index, geometry);
@@ -191,8 +201,29 @@ export class MeshAnalyzer {
         const curvature = this.calculateCurvature(vertex, neighbors);
         curvatureMap.set(vertex.index, curvature);
       }
+      
+      processed += batch.length;
+      
+      // Yield control to prevent UI blocking
+      if (i % (batchSize * 5) === 0) {
+        await new Promise(resolve => setTimeout(resolve, 1));
+        console.log(`Curvature progress: ${processed}/${sampledVertices.length} (${Math.round(processed/sampledVertices.length*100)}%)`);
+      }
     }
 
     return curvatureMap;
+  }
+
+  static sampleVertices(vertices: MeshVertex[], maxCount: number): MeshVertex[] {
+    if (vertices.length <= maxCount) return vertices;
+    
+    const step = Math.floor(vertices.length / maxCount);
+    const sampled: MeshVertex[] = [];
+    
+    for (let i = 0; i < vertices.length; i += step) {
+      sampled.push(vertices[i]);
+    }
+    
+    return sampled.slice(0, maxCount);
   }
 }

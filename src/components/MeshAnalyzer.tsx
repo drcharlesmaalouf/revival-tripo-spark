@@ -45,8 +45,8 @@ export const MeshAnalyzerComponent = ({
         const vertices = MeshAnalyzer.analyzeMeshGeometry(mainMesh);
         console.log(`Analyzed ${vertices.length} vertices`);
         
-        // Calculate curvature map
-        const curvatureMap = MeshAnalyzer.createCurvatureMap(vertices, mainMesh.geometry);
+        // Calculate curvature map (now async)
+        const curvatureMap = await MeshAnalyzer.createCurvatureMap(vertices, mainMesh.geometry);
         console.log('Curvature analysis complete');
         
         // Detect breast regions

@@ -23,14 +23,34 @@ export class BreastDetector {
     const center = boundingBox.getCenter(new THREE.Vector3());
     const size = boundingBox.getSize(new THREE.Vector3());
     
-    console.log('Mesh bounds:', { center, size });
+    console.log('Mesh bounds:', { 
+      center: center.toArray(), 
+      size: size.toArray(),
+      minPoint: boundingBox.min.toArray(),
+      maxPoint: boundingBox.max.toArray()
+    });
     
-    // Filter vertices in chest region based on geometry
+    // Debug: Check vertex distribution
+    console.log('Sample vertex positions:');
+    for (let i = 0; i < Math.min(10, vertices.length); i += Math.floor(vertices.length / 10)) {
+      const v = vertices[i];
+      console.log(`Vertex ${i}: pos=${v.position.toArray()}, normal=${v.normal.toArray()}`);
+    }
+    
+    // Filter vertices in chest region based on geometry (very lenient initially)
     const chestVertices = this.filterChestRegion(vertices, center, size);
     console.log(`Found ${chestVertices.length} chest vertices`);
     
+    // If no chest vertices found, try with more lenient criteria
+    let finalChestVertices = chestVertices;
+    if (chestVertices.length === 0) {
+      console.log('No chest vertices found, trying more lenient criteria...');
+      finalChestVertices = this.filterChestRegionLenient(vertices, center, size);
+      console.log(`Found ${finalChestVertices.length} vertices with lenient criteria`);
+    }
+    
     // Find high curvature regions (potential breast/nipple areas)
-    const highCurvatureVertices = this.findHighCurvatureRegions(chestVertices, curvatureMap);
+    const highCurvatureVertices = this.findHighCurvatureRegions(finalChestVertices, curvatureMap);
     console.log(`Found ${highCurvatureVertices.length} high curvature vertices`);
     
     // Cluster vertices into left and right breast regions
@@ -57,29 +77,36 @@ export class BreastDetector {
   }
 
   private static filterChestRegion(vertices: MeshVertex[], center: THREE.Vector3, size: THREE.Vector3): MeshVertex[] {
-    // Calculate adaptive thresholds based on model size
-    const sizeScale = Math.max(size.x, size.y, size.z);
-    
     return vertices.filter(vertex => {
       const pos = vertex.position;
       const relative = pos.clone().sub(center);
       
-      // More adaptive chest region criteria:
-      // 1. Upper body region (more generous range)
-      const isUpperBody = relative.y > -size.y * 0.6 && relative.y < size.y * 0.6;
+      // Very lenient chest region criteria (cast a wide net first):
+      // 1. Any upper body region
+      const isUpperBody = relative.y > -size.y * 0.8;
       
-      // 2. Front-facing area (detect based on normal direction as well)
-      const normalDirection = vertex.normal.z; // Assuming Z is forward
-      const isForwardFacing = normalDirection > -0.3 && relative.z > -size.z * 0.4;
+      // 2. Front half of the model
+      const isForwardHalf = relative.z > -size.z * 0.5;
       
-      // 3. Central torso area (exclude arms and outer edges)
-      const isCentralTorso = Math.abs(relative.x) < size.x * 0.6;
+      // 3. Central 80% (exclude far edges)
+      const isCentral = Math.abs(relative.x) < size.x * 0.8;
       
-      // 4. Reasonable distance from center
-      const distanceFromCenter = relative.length();
-      const isReasonableDistance = distanceFromCenter < sizeScale * 1.2;
+      return isUpperBody && isForwardHalf && isCentral;
+    });
+  }
+
+  private static filterChestRegionLenient(vertices: MeshVertex[], center: THREE.Vector3, size: THREE.Vector3): MeshVertex[] {
+    // Extremely lenient - just exclude obvious outliers
+    return vertices.filter(vertex => {
+      const pos = vertex.position;
+      const relative = pos.clone().sub(center);
       
-      return isUpperBody && isForwardFacing && isCentralTorso && isReasonableDistance;
+      // Just exclude vertices that are obviously not part of the torso
+      const isNotTooFarBelow = relative.y > -size.y * 1.0;
+      const isNotTooFarBack = relative.z > -size.z * 0.8;
+      const isNotTooFarSide = Math.abs(relative.x) < size.x * 1.0;
+      
+      return isNotTooFarBelow && isNotTooFarBack && isNotTooFarSide;
     });
   }
 
