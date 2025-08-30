@@ -225,29 +225,17 @@ const Scene = forwardRef<any, {
       {modelUrl ? (
         <group>
           <GeneratedModel modelUrl={modelUrl} onSceneLoaded={onSceneLoaded} />
-          {/* Add visualization markers on top when analysis is complete */}
-          {(() => {
-            console.log('=== VISUALIZATION RENDER CHECK ===');
-            console.log('- meshAnalysisResults:', !!meshAnalysisResults);
-            console.log('- showVisualization:', showVisualization);
-            console.log('- landmarks:', !!meshAnalysisResults?.landmarks);
-            console.log('- leftNipple:', !!meshAnalysisResults?.landmarks?.leftNipple);
-            console.log('- rightNipple:', !!meshAnalysisResults?.landmarks?.rightNipple);
-            
-            if (meshAnalysisResults && showVisualization && meshAnalysisResults.landmarks) {
-              console.log('Creating visualization markers...');
-              const markers = BreastDetector.createVisualizationMarkers(meshAnalysisResults.landmarks);
-              console.log('Markers created:', markers);
-              return (
-                <primitive
-                  object={markers}
-                  scale={[10, 10, 10]}
-                  position={[0, 0, 0]}
-                />
-              );
-            }
-            return null;
-          })()}
+          {/* Add visualization markers ONLY when analysis is complete and visualization is enabled */}
+          {meshAnalysisResults && showVisualization && meshAnalysisResults.landmarks && (
+            <group>
+              {/* Position markers relative to the same coordinate system as the model */}
+              <primitive
+                object={BreastDetector.createVisualizationMarkers(meshAnalysisResults.landmarks)}
+                scale={[10, 10, 10]}
+                position={[0, 0, 0]}
+              />
+            </group>
+          )}
         </group>
       ) : (
         <PlaceholderModel />
@@ -536,6 +524,17 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                   <p>Right nipple: {meshAnalysisResults.landmarks.rightNipple ? '✓ Detected' : '✗ Not found'}</p>
                   <p>Left region: {meshAnalysisResults.landmarks.leftBreastRegion?.vertices.length || 0} vertices</p>
                   <p>Right region: {meshAnalysisResults.landmarks.rightBreastRegion?.vertices.length || 0} vertices</p>
+                  
+                  {/* Calculate and display nipple-to-nipple distance */}
+                  {meshAnalysisResults.landmarks.leftNipple && meshAnalysisResults.landmarks.rightNipple && (
+                    <div className="mt-2 pt-2 border-t">
+                      <p className="font-medium">
+                        Nipple distance: {
+                          (meshAnalysisResults.landmarks.leftNipple.distanceTo(meshAnalysisResults.landmarks.rightNipple) * 100).toFixed(1)
+                        } cm
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
