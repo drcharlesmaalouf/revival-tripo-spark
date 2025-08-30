@@ -541,30 +541,30 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                   <RotateCcw className="w-4 h-4" />
                 </Button>
 
-                {/* Analysis controls - only in fullscreen */}
-                {(() => {
-                  console.log('Rendering fullscreen controls:', { 
-                    modelUrl: !!modelUrl, 
-                    analysisData: !!analysisData,
-                    showingEyeButton: !!(modelUrl && analysisData)
-                  });
-                  return null;
-                })()}
-                
-                {modelUrl && analysisData && (
-                  <>
-                    <Button
-                      variant={showMarkers ? "default" : "secondary"}
-                      size="sm"
-                      onClick={() => {
-                        console.log('Eye button clicked, toggling showMarkers from', showMarkers, 'to', !showMarkers);
-                        setShowMarkers(!showMarkers);
-                      }}
-                      className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
-                      title="Toggle detection visualization"
-                    >
-                      {showMarkers ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                    </Button>
+                {/* Analysis controls - always show in fullscreen for debugging */}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="bg-background/80 backdrop-blur-sm hover:bg-background/90 text-xs"
+                  onClick={() => console.log('Analysis state:', { analysisData: !!analysisData, modelUrl: !!modelUrl })}
+                >
+                  Debug
+                </Button>
+
+                {/* Force show eye button if we have any data */}
+                <Button
+                  variant={showMarkers ? "default" : "secondary"}
+                  size="sm"
+                  onClick={() => {
+                    console.log('Toggling showMarkers from', showMarkers, 'to', !showMarkers);
+                    console.log('Current analysisData:', analysisData);
+                    setShowMarkers(!showMarkers);
+                  }}
+                  className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
+                  title="Toggle detection visualization"
+                >
+                  {showMarkers ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                </Button>
 
                     <Button
                       variant={showImplants ? "default" : "secondary"}
@@ -575,30 +575,6 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                     >
                       <span className="w-4 h-4 text-xs font-bold">300</span>
                     </Button>
-                  </>
-                )}
-
-                {modelUrl && !analysisData && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="bg-background/80 backdrop-blur-sm hover:bg-background/90 text-xs"
-                    disabled
-                  >
-                    Analyzing...
-                  </Button>
-                )}
-
-                {!modelUrl && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="bg-background/80 backdrop-blur-sm hover:bg-background/90 text-xs"
-                    disabled
-                  >
-                    No Model
-                  </Button>
-                )}
 
                 {modelUrl && (
                   <Button
