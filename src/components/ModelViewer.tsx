@@ -48,6 +48,7 @@ const GeneratedModel = ({
   const groupRef = useRef<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
+  const { toast } = useToast();
 
   // Check if it's a blob URL - use directly, otherwise use proxy
   const shouldUseProxy = !modelUrl.startsWith('blob:') && !modelUrl.startsWith('data:');
@@ -62,7 +63,15 @@ const GeneratedModel = ({
 
   // Perform anatomical analysis when model loads
   useEffect(() => {
+    console.log('Analysis effect triggered:', {
+      hasScene: !!gltfResult?.scene,
+      isAnalyzing,
+      hasAnalyzed,
+      hasCallback: !!onAnalysisComplete
+    });
+    
     if (gltfResult?.scene && !isAnalyzing && !hasAnalyzed && onAnalysisComplete) {
+      console.log('Starting anatomical analysis for model...');
       setIsAnalyzing(true);
       setHasAnalyzed(true);
       
@@ -73,8 +82,12 @@ const GeneratedModel = ({
         })
         .catch((error) => {
           console.error('Anatomical analysis failed:', error);
-          // Don't trigger the onAnalysisComplete if validation fails
-          // This prevents the success toast from showing for invalid models
+          // Show error to user
+          toast({
+            variant: "destructive",
+            title: "Analysis Failed",
+            description: error.message || "Model does not appear suitable for anatomical analysis.",
+          });
         })
         .finally(() => {
           setIsAnalyzing(false);
