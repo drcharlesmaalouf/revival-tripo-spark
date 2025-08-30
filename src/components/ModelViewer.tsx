@@ -341,7 +341,12 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
       {/* Normal viewer */}
       <div className={`relative h-full w-full overflow-hidden rounded-lg bg-gradient-secondary ${isFullscreen ? 'opacity-50' : ''}`}>
         <Canvas
-          camera={{ position: [1, 0.5, 1], fov: 75 }}
+          camera={{ 
+            position: [1, 0.5, 1], 
+            fov: 75,
+            near: 0.001,
+            far: 1000
+          }}
           style={{ background: "transparent" }}
           onCreated={({ gl }) => {
             // Handle WebGL context loss
@@ -496,7 +501,12 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
             {/* Window content */}
             <div className="relative bg-gradient-secondary" style={{ height: windowSize.height - 48 }}>
               <Canvas
-                camera={{ position: [1, 0.5, 1], fov: 75 }}
+                camera={{ 
+                  position: [1, 0.5, 1], 
+                  fov: 75,
+                  near: 0.001,
+                  far: 1000
+                }}
                 style={{ background: "transparent" }}
                 onCreated={({ gl }) => {
                   // Handle WebGL context loss for fullscreen viewer too
