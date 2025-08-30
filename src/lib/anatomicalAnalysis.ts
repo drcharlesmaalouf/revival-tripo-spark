@@ -57,27 +57,37 @@ class AnatomicalAnalyzer {
     const vertexAnalysis = this.analyzeMeshGeometry(mainMesh);
     
     // Debug the analysis results
-    console.log('=== ANALYSIS DEBUG ===');
+    console.log('=== BREAST DETECTION ANALYSIS ===');
     const nippleCandidates = vertexAnalysis.filter(v => v.isNippleCandidate);
     const breastVertices = vertexAnalysis.filter(v => v.isBreastRegion);
     
-    console.log('Total vertices analyzed:', vertexAnalysis.length);
-    console.log('Nipple candidates found:', nippleCandidates.length);
-    console.log('Breast region vertices:', breastVertices.length);
+    console.log('Model mesh info:', {
+      totalVertices: vertexAnalysis.length,
+      meshPosition: mainMesh.position,
+      meshScale: mainMesh.scale,
+      boundingBox: new THREE.Box3().setFromObject(mainMesh).getSize(new THREE.Vector3())
+    });
     
-    // Log nipple candidate positions
-    nippleCandidates.forEach((candidate, idx) => {
+    console.log('Detection results:', {
+      nippleCandidatesFound: nippleCandidates.length,
+      breastRegionVertices: breastVertices.length,
+      leftBreastVertices: breastVertices.filter(v => v.breastSide === 'left').length,
+      rightBreastVertices: breastVertices.filter(v => v.breastSide === 'right').length
+    });
+    
+    // Log first few nipple candidates for debugging
+    nippleCandidates.slice(0, 5).forEach((candidate, idx) => {
       console.log(`Nipple candidate ${idx + 1}:`, {
-        position: candidate.position,
-        curvature: candidate.curvature,
+        position: `(${candidate.position.x.toFixed(2)}, ${candidate.position.y.toFixed(2)}, ${candidate.position.z.toFixed(2)})`,
+        curvature: candidate.curvature.toFixed(3),
         side: candidate.breastSide
       });
     });
 
-    // For now, let's create a simple manual detection approach
+    // Use manual landmarks for now since automatic detection needs work
     const landmarks = this.createManualLandmarks(mainMesh);
 
-    // Create color-coded mesh for visualization
+    // Create color-coded mesh for visualization (but don't use it as main display)
     const analyzedMesh = this.createColorCodedMesh(mainMesh, vertexAnalysis);
 
     // Extract breast meshes

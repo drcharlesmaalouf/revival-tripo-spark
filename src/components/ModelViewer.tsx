@@ -171,8 +171,8 @@ const Scene = forwardRef<any, {
         <PlaceholderModel />
       )}
 
-      {/* Show color-coded mesh in fullscreen mode when available */}
-      {isFullscreen && analysisData?.analyzedMesh && (
+      {/* Show color-coded mesh ONLY in fullscreen mode when specifically requested */}
+      {isFullscreen && showMarkers && analysisData?.analyzedMesh && (
         <primitive object={analysisData.analyzedMesh} />
       )}
 
@@ -532,7 +532,7 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                       size="sm"
                       onClick={() => setShowMarkers(!showMarkers)}
                       className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
-                      title="Toggle anatomical landmarks"
+                      title="Toggle detection visualization"
                     >
                       {showMarkers ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                     </Button>
