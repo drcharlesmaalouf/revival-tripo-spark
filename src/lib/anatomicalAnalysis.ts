@@ -280,17 +280,17 @@ class AnatomicalAnalyzer {
     return mesh;
   }
 
-  // Method to get implant position at inframammary fold (scaled for 10x model)
+  // Method to get implant position at inframammary fold
   getImplantPosition(landmarks: AnatomicalLandmarks, side: 'left' | 'right'): THREE.Vector3 {
     const foldPosition = side === 'left' 
       ? landmarks.leftInframammaryFold 
       : landmarks.rightInframammaryFold;
 
-    // Position implant in front of chest, at the inframammary fold
+    // Position implant in front of chest, at the inframammary fold (scaled for model)
     return new THREE.Vector3(
       foldPosition.x,
-      foldPosition.y + 0.2, // Slightly above fold
-      foldPosition.z + 0.5  // Forward from chest wall (not behind!)
+      foldPosition.y + 0.02, // Slightly above fold
+      foldPosition.z + 0.05  // Slightly forward from chest wall
     );
   }
 }

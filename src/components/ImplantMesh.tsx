@@ -8,10 +8,10 @@ interface ImplantMeshProps {
   visible?: boolean;
 }
 
-// Generic 300cc implant: 12cm diameter, 4cm projection (scaled up for 10x model)
+// Generic 300cc implant: 12cm diameter, 4cm projection (properly scaled for model)
 const IMPLANT_SPECS = {
-  diameter: 1.2, // 12cm scaled to match 10x model
-  projection: 0.4, // 4cm scaled to match 10x model
+  diameter: 0.12, // 12cm - realistic size relative to human body
+  projection: 0.04, // 4cm - realistic projection
   volume: 300 // cc
 };
 
