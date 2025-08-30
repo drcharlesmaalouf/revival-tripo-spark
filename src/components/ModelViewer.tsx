@@ -1,4 +1,4 @@
-import { Suspense, useRef, useImperativeHandle, forwardRef, useState, useEffect } from "react";
+import { Suspense, useRef, useImperativeHandle, forwardRef, useState, useEffect, useCallback } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Environment, Box, useGLTF } from "@react-three/drei";
 import { Mesh } from "three";
@@ -171,6 +171,7 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
   const sceneRef = useRef<any>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [loadedScene, setLoadedScene] = useState<THREE.Group | null>(null);
+  const analysisCompletedRef = useRef<boolean>(false);
   
   // Mesh analysis state
   const [meshAnalysisResults, setMeshAnalysisResults] = useState<{
@@ -191,36 +192,41 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
   
   const { toast } = useToast();
 
-  // Get the loaded scene from the model
+  // Reset analysis state when URL changes
   useEffect(() => {
     if (modelUrl) {
-      // This will be populated when the model loads
-      // We need to extract the scene from the GLTF result
       setLoadedScene(null);
       setMeshAnalysisResults(null);
       setShowVisualization(false);
       setShowAugmented(false);
+      analysisCompletedRef.current = false;
     }
   }, [modelUrl]);
 
-  const handleMeshAnalysisComplete = (results: {
+  const handleMeshAnalysisComplete = useCallback((results: {
     originalMesh: THREE.Mesh;
     landmarks: BreastLandmarks;
     visualizationMesh: THREE.Mesh;
     augmentedMesh?: THREE.Mesh;
   }) => {
+    if (analysisCompletedRef.current) {
+      console.log('Analysis already completed, skipping');
+      return;
+    }
+    
     console.log('Mesh analysis complete:', results);
+    analysisCompletedRef.current = true;
     setMeshAnalysisResults(results);
     toast({
       title: "Mesh Analysis Complete",
       description: "Breast regions detected from mesh geometry.",
     });
-  };
+  }, [toast]);
 
-  const handleSceneLoaded = (scene: THREE.Group) => {
+  const handleSceneLoaded = useCallback((scene: THREE.Group) => {
     console.log('Scene loaded in ModelViewer:', scene);
     setLoadedScene(scene);
-  };
+  }, []);
 
   const handleDownload = () => {
     if (modelUrl) {
