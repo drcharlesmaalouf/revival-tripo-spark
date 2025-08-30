@@ -172,7 +172,7 @@ class AnatomicalAnalyzer {
     const center = boundingBox.getCenter(new THREE.Vector3());
     const size = boundingBox.getSize(new THREE.Vector3());
 
-    // Estimate anatomical landmarks based on standard proportions
+    // Estimate anatomical landmarks based on standard proportions (scaled for 10x model)
     const landmarks: AnatomicalLandmarks = {
       // Inframammary fold typically at 75% down from top of torso
       leftInframammaryFold: new THREE.Vector3(
@@ -280,17 +280,17 @@ class AnatomicalAnalyzer {
     return mesh;
   }
 
-  // Method to get implant position at inframammary fold
+  // Method to get implant position at inframammary fold (scaled for 10x model)
   getImplantPosition(landmarks: AnatomicalLandmarks, side: 'left' | 'right'): THREE.Vector3 {
     const foldPosition = side === 'left' 
       ? landmarks.leftInframammaryFold 
       : landmarks.rightInframammaryFold;
 
-    // Position implant slightly behind the fold, touching the chest wall
+    // Position implant in front of chest, at the inframammary fold
     return new THREE.Vector3(
       foldPosition.x,
-      foldPosition.y - 0.02, // Slightly below fold
-      foldPosition.z - 0.05  // Slightly back toward chest wall
+      foldPosition.y + 0.2, // Slightly above fold
+      foldPosition.z + 0.5  // Forward from chest wall (not behind!)
     );
   }
 }
