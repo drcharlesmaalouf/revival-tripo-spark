@@ -41,31 +41,60 @@ export const InteractiveTools = ({
   }, [mode]);
 
   const createInitialContour = useCallback(() => {
-    // Find the center of the 3D model to position the initial circle
-    const modelCenter = new THREE.Vector3(0, 0, 0);
-    const radius = 0.15; // Adjust based on your model scale
+    // Find the actual model dimensions to size the contour appropriately
+    const modelBounds = new THREE.Box3();
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh && 
+          !child.name.includes('contour') && 
+          !child.name.includes('Nipple') &&
+          child.name !== 'BreastMarkers' && 
+          child.name !== 'ManualAnnotations') {
+        modelBounds.expandByObject(child);
+      }
+    });
     
-    // Create 5 points in a circle
+    const modelSize = modelBounds.getSize(new THREE.Vector3());
+    const modelCenter = modelBounds.getCenter(new THREE.Vector3());
+    
+    // Calculate breast-appropriate sizing
+    const breastRadius = Math.min(modelSize.x, modelSize.y) * 0.15; // 15% of model size
+    const pointSize = breastRadius * 0.05; // Points are 5% of breast radius
+    
+    // Position based on which breast we're contouring
+    const xOffset = mode === 'leftContour' ? -modelSize.x * 0.15 : modelSize.x * 0.15;
+    const breastCenter = new THREE.Vector3(
+      modelCenter.x + xOffset,
+      modelCenter.y + modelSize.y * 0.1, // Slightly above center
+      modelCenter.z + modelSize.z * 0.3  // Forward on the chest
+    );
+    
+    // Create 4 points in an ellipse (more natural breast shape)
     const points: ContourPoint[] = [];
-    for (let i = 0; i < 5; i++) {
-      const angle = (i / 5) * Math.PI * 2;
-      const x = modelCenter.x + Math.cos(angle) * radius;
-      const y = modelCenter.y + Math.sin(angle) * radius * 0.7; // Slightly elliptical
-      const z = modelCenter.z + 0.1; // Slightly forward
+    for (let i = 0; i < 4; i++) {
+      const angle = (i / 4) * Math.PI * 2;
+      const x = breastCenter.x + Math.cos(angle) * breastRadius;
+      const y = breastCenter.y + Math.sin(angle) * breastRadius * 0.8; // Elliptical
+      const z = breastCenter.z;
       
       const position = new THREE.Vector3(x, y, z);
       
-      // Create visible handle (much smaller)
-      const handleGeometry = new THREE.SphereGeometry(0.008, 12, 12); // Reduced from 0.02 to 0.008
+      // Create tiny, visible handle
+      const handleGeometry = new THREE.SphereGeometry(pointSize, 8, 8);
       const handleMaterial = new THREE.MeshStandardMaterial({ 
-        color: mode === 'leftContour' ? 0xff69b4 : 0x4169e1,
+        color: mode === 'leftContour' ? 0xff1493 : 0x1e90ff, // Deep pink vs deep blue
         transparent: true,
-        opacity: 0.9,
-        emissive: 0x000000
+        opacity: 0.8,
+        emissive: 0x000000,
+        metalness: 0.1,
+        roughness: 0.3
       });
       const handleMesh = new THREE.Mesh(handleGeometry, handleMaterial);
       handleMesh.position.copy(position);
       handleMesh.name = `contour-handle-${i}`;
+      
+      // Make handles always visible on top
+      handleMesh.renderOrder = 999;
+      handleMesh.material.depthTest = false;
       
       scene.add(handleMesh);
       
@@ -78,6 +107,8 @@ export const InteractiveTools = ({
     
     setContourPoints(points);
     updateContourVisualization(points);
+    
+    console.log(`Created ${mode} contour with ${points.length} points, size: ${pointSize.toFixed(4)}`);
   }, [mode, scene]);
 
   const updateContourVisualization = useCallback((points: ContourPoint[]) => {
@@ -144,10 +175,18 @@ export const InteractiveTools = ({
       const pointIndex = contourPoints.findIndex(p => p.mesh === clickedMesh);
       
       if (pointIndex !== -1) {
+        console.log('Starting drag of point', pointIndex);
+        
         // COMPLETELY disable OrbitControls during dragging
         if (controls && 'enabled' in controls) {
           (controls as any).enabled = false;
+          console.log('OrbitControls disabled');
         }
+        
+        // Disable all pointer events on canvas for camera controls
+        const canvas = gl.domElement;
+        canvas.style.pointerEvents = 'none';
+        setTimeout(() => canvas.style.pointerEvents = 'auto', 10);
         
         setDragState({
           isDragging: true,
@@ -155,21 +194,25 @@ export const InteractiveTools = ({
           offset: new THREE.Vector3()
         });
         
-        // Change handle appearance (make brighter and slightly larger)
+        // Visual feedback - make point brighter and slightly larger
         const material = clickedMesh.material as THREE.MeshStandardMaterial;
         material.opacity = 1.0;
-        material.emissive.setHex(0x444444); // Add glow effect
-        clickedMesh.scale.setScalar(1.5); // Make slightly larger when dragging
+        material.emissive.setHex(0x666666);
+        clickedMesh.scale.setScalar(2.0); // Double size when dragging
         
-        // Prevent any event bubbling
-        event.stopPropagation();
+        // Stop all event propagation
+        event.stopImmediatePropagation();
         event.preventDefault();
       }
     }
-  }, [mode, contourPoints, camera, raycaster, controls]);
+  }, [mode, contourPoints, camera, raycaster, controls, gl]);
 
   const handleMouseMove = useCallback((event: MouseEvent) => {
     if (!dragState.isDragging || dragState.pointIndex === null) return;
+
+    // Prevent any camera movement
+    event.stopImmediatePropagation();
+    event.preventDefault();
 
     const canvas = event.target as HTMLCanvasElement;
     const rect = canvas.getBoundingClientRect();
@@ -178,10 +221,9 @@ export const InteractiveTools = ({
       -((event.clientY - rect.top) / rect.height) * 2 + 1
     );
 
-    // Cast ray to find new position on the model
     raycaster.setFromCamera(mouseRef.current, camera);
     
-    // Find intersection with the 3D model
+    // Find intersection with the 3D model (excluding our own handles)
     const meshes: THREE.Mesh[] = [];
     scene.traverse((child) => {
       if (child instanceof THREE.Mesh && 
@@ -198,31 +240,32 @@ export const InteractiveTools = ({
     if (intersects.length > 0) {
       const newPosition = intersects[0].point.clone();
       
-      // Update the point position
-      setContourPoints(prev => {
-        const updated = [...prev];
-        updated[dragState.pointIndex!].position.copy(newPosition);
-        updated[dragState.pointIndex!].mesh.position.copy(newPosition);
-        return updated;
-      });
+      // Update the point position immediately
+      const updatedPoints = [...contourPoints];
+      updatedPoints[dragState.pointIndex].position.copy(newPosition);
+      updatedPoints[dragState.pointIndex].mesh.position.copy(newPosition);
+      setContourPoints(updatedPoints);
       
-      // Update visualization in real-time
-      updateContourVisualization(contourPoints);
+      // Update visualization line
+      updateContourVisualization(updatedPoints);
     }
   }, [dragState, camera, raycaster, scene, contourPoints, updateContourVisualization]);
 
   const handleMouseUp = useCallback(() => {
     if (dragState.isDragging && dragState.pointIndex !== null) {
+      console.log('Ending drag of point', dragState.pointIndex);
+      
       // Reset handle appearance
       const handle = contourPoints[dragState.pointIndex].mesh;
       const material = handle.material as THREE.MeshStandardMaterial;
-      material.opacity = 0.9;
-      material.emissive.setHex(0x000000); // Remove glow
-      handle.scale.setScalar(1.0); // Reset size
+      material.opacity = 0.8;
+      material.emissive.setHex(0x000000);
+      handle.scale.setScalar(1.0);
       
       // Re-enable OrbitControls
       if (controls && 'enabled' in controls) {
         (controls as any).enabled = true;
+        console.log('OrbitControls re-enabled');
       }
     }
     
@@ -290,20 +333,45 @@ export const InteractiveTools = ({
     clearContour();
   }, [contourPoints, mode, onContourComplete, clearContour]);
 
-  // Simplified event listeners 
+  // High-priority event listeners to prevent camera movement
   useEffect(() => {
     const canvas = gl.domElement;
     
-    canvas.addEventListener('mousedown', handleMouseDown);
-    canvas.addEventListener('mousemove', handleMouseMove);
-    canvas.addEventListener('mouseup', handleMouseUp);
+    const handleMouseDownCapture = (e: MouseEvent) => {
+      if (dragState.isDragging) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+      }
+      handleMouseDown(e);
+    };
+    
+    const handleMouseMoveCapture = (e: MouseEvent) => {
+      if (dragState.isDragging) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+      }
+      handleMouseMove(e);
+    };
+    
+    const handleMouseUpCapture = (e: MouseEvent) => {
+      if (dragState.isDragging) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+      }
+      handleMouseUp();
+    };
+    
+    // Use capture phase to intercept events before OrbitControls
+    canvas.addEventListener('mousedown', handleMouseDownCapture, { capture: true, passive: false });
+    canvas.addEventListener('mousemove', handleMouseMoveCapture, { capture: true, passive: false });
+    canvas.addEventListener('mouseup', handleMouseUpCapture, { capture: true, passive: false });
     
     return () => {
-      canvas.removeEventListener('mousedown', handleMouseDown);
-      canvas.removeEventListener('mousemove', handleMouseMove);
-      canvas.removeEventListener('mouseup', handleMouseUp);
+      canvas.removeEventListener('mousedown', handleMouseDownCapture, { capture: true });
+      canvas.removeEventListener('mousemove', handleMouseMoveCapture, { capture: true });
+      canvas.removeEventListener('mouseup', handleMouseUpCapture, { capture: true });
     };
-  }, [handleMouseDown, handleMouseMove, handleMouseUp, gl]);
+  }, [handleMouseDown, handleMouseMove, handleMouseUp, gl, dragState.isDragging]);
 
   // Keyboard shortcuts
   useEffect(() => {
