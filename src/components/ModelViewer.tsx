@@ -49,13 +49,15 @@ const GeneratedModel = ({ modelUrl }: { modelUrl: string }) => {
   let gltfResult = null;
   try {
     gltfResult = useGLTF(finalUrl);
-    console.log('Model loaded successfully');
+    console.log('Model loaded successfully:', gltfResult);
   } catch (error) {
     console.error('Model loading failed:', error);
+    console.error('Failed URL:', finalUrl);
     // Return fallback component
   }
 
   if (!gltfResult?.scene) {
+    console.log('No GLTF scene found - showing green cube fallback');
     return (
       <Box args={[1.5, 1.5, 1.5]}>
         <meshStandardMaterial
