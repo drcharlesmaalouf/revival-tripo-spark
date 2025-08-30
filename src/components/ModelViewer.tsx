@@ -250,6 +250,7 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
   const { toast } = useToast();
 
   const handleAnalysisComplete = (data: BreastMeshData) => {
+    console.log('Analysis complete callback received:', data);
     setAnalysisData(data);
     toast({
       title: "Analysis Complete",
@@ -259,6 +260,7 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
 
   // Clear analysis data when model changes and force re-analysis
   useEffect(() => {
+    console.log('Model URL effect triggered:', { modelUrl, hasAnalysisData: !!analysisData });
     if (modelUrl) {
       console.log('Model URL changed, clearing analysis data:', modelUrl);
       setAnalysisData(null);
@@ -539,7 +541,7 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                 </Button>
 
                 {/* Analysis controls - only in fullscreen */}
-                {analysisData && (
+                {modelUrl && analysisData && (
                   <>
                     <Button
                       variant={showMarkers ? "default" : "secondary"}
@@ -561,6 +563,28 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                       <span className="w-4 h-4 text-xs font-bold">300</span>
                     </Button>
                   </>
+                )}
+
+                {modelUrl && !analysisData && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="bg-background/80 backdrop-blur-sm hover:bg-background/90 text-xs"
+                    disabled
+                  >
+                    Analyzing...
+                  </Button>
+                )}
+
+                {!modelUrl && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="bg-background/80 backdrop-blur-sm hover:bg-background/90 text-xs"
+                    disabled
+                  >
+                    No Model
+                  </Button>
                 )}
 
                 {modelUrl && (
