@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { anatomicalAnalyzer, AnatomicalLandmarks, BreastMeshData } from "@/lib/anatomicalAnalysis";
 import { MeasurementDisplay } from "./MeasurementDisplay";
+import { ScaleInput } from "./ScaleInput";
 import { AnatomicalMarkers } from "./AnatomicalMarkers";
 import { ImplantMesh } from "./ImplantMesh";
 import * as THREE from "three";
@@ -143,7 +144,8 @@ const Scene = forwardRef<any, {
   showMarkers?: boolean;
   showImplants?: boolean;
   onAnalysisComplete?: (data: BreastMeshData) => void;
-}>(({ modelUrl, analysisData, showMarkers = false, showImplants = false, onAnalysisComplete }, ref) => {
+  isFullscreen?: boolean;
+}>(({ modelUrl, analysisData, showMarkers = false, showImplants = false, onAnalysisComplete, isFullscreen = false }, ref) => {
   const controlsRef = useRef<any>(null);
 
   useImperativeHandle(ref, () => ({
@@ -169,8 +171,8 @@ const Scene = forwardRef<any, {
         <PlaceholderModel />
       )}
 
-      {/* Anatomical markers and implants overlay */}
-      {analysisData && (
+      {/* Anatomical markers and implants overlay - only show in fullscreen */}
+      {isFullscreen && analysisData && (
         <>
           {showMarkers && (
             <AnatomicalMarkers 
@@ -225,6 +227,7 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
   const [analysisData, setAnalysisData] = useState<BreastMeshData | null>(null);
   const [showMarkers, setShowMarkers] = useState(false);
   const [showImplants, setShowImplants] = useState(false);
+  const [userNippleDistance, setUserNippleDistance] = useState<number | undefined>(undefined);
   const { toast } = useToast();
 
   const handleAnalysisComplete = (data: BreastMeshData) => {
@@ -383,11 +386,12 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
               showMarkers={showMarkers}
               showImplants={showImplants}
               onAnalysisComplete={handleAnalysisComplete}
+              isFullscreen={false}
             />
           </Suspense>
         </Canvas>
 
-        {/* Control Panel */}
+        {/* Control Panel - Simple controls only */}
         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2">
           <Button
             variant="secondary"
@@ -407,31 +411,6 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
             <Maximize2 className="w-4 h-4" />
           </Button>
 
-          {/* Anatomical Analysis Controls */}
-          {analysisData && (
-            <>
-              <Button
-                variant={showMarkers ? "default" : "secondary"}
-                size="sm"
-                onClick={() => setShowMarkers(!showMarkers)}
-                className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
-                title="Toggle anatomical landmarks"
-              >
-                {showMarkers ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-              </Button>
-
-              <Button
-                variant={showImplants ? "default" : "secondary"}
-                size="sm"
-                onClick={() => setShowImplants(!showImplants)}
-                className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
-                title="Toggle implant preview"
-              >
-                <span className="w-4 h-4 text-xs font-bold">300</span>
-              </Button>
-            </>
-          )}
-
           {modelUrl && (
             <Button
               variant="default"
@@ -444,16 +423,6 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
             </Button>
           )}
         </div>
-        
-        {/* Measurement Display */}
-        {analysisData && (
-          <div className="absolute top-2 right-2">
-            <MeasurementDisplay 
-              measurements={analysisData.measurements}
-              modelScale={analysisData.modelScale}
-            />
-          </div>
-        )}
 
         {/* Instructions */}
         {!modelUrl && !isFullscreen && (
@@ -540,11 +509,12 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                     showMarkers={showMarkers}
                     showImplants={showImplants}
                     onAnalysisComplete={handleAnalysisComplete}
+                    isFullscreen={true}
                   />
                 </Suspense>
               </Canvas>
 
-              {/* Window controls */}
+              {/* Analysis controls in fullscreen - at bottom center */}
               <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2">
                 <Button
                   variant="secondary"
@@ -554,6 +524,31 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                 >
                   <RotateCcw className="w-4 h-4" />
                 </Button>
+
+                {/* Analysis controls - only in fullscreen */}
+                {analysisData && (
+                  <>
+                    <Button
+                      variant={showMarkers ? "default" : "secondary"}
+                      size="sm"
+                      onClick={() => setShowMarkers(!showMarkers)}
+                      className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
+                      title="Toggle anatomical landmarks"
+                    >
+                      {showMarkers ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                    </Button>
+
+                    <Button
+                      variant={showImplants ? "default" : "secondary"}
+                      size="sm"
+                      onClick={() => setShowImplants(!showImplants)}
+                      className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
+                      title="Toggle implant preview"
+                    >
+                      <span className="w-4 h-4 text-xs font-bold">300</span>
+                    </Button>
+                  </>
+                )}
 
                 {modelUrl && (
                   <Button
@@ -567,6 +562,22 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                   </Button>
                 )}
               </div>
+
+              {/* Measurement Display in fullscreen - top right */}
+              {analysisData && (
+                <div className="absolute top-12 right-2 max-w-sm">
+                  <div className="space-y-2">
+                    <ScaleInput 
+                      onScaleSet={setUserNippleDistance}
+                      currentScale={userNippleDistance}
+                    />
+                    <MeasurementDisplay 
+                      measurements={analysisData.measurements}
+                      userNippleDistance={userNippleDistance}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Resize handle - bottom-right corner */}

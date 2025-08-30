@@ -6,11 +6,26 @@ import { Ruler, Target, Maximize2 } from 'lucide-react';
 
 interface MeasurementDisplayProps {
   measurements: BreastMeasurements;
-  modelScale?: number;
+  userNippleDistance?: number; // User-provided actual distance in meters
 }
 
-export const MeasurementDisplay = ({ measurements, modelScale = 10 }: MeasurementDisplayProps) => {
-  const realWorldMeasurements = BreastMeasurementAnalyzer.toRealWorldScale(measurements, modelScale);
+export const MeasurementDisplay = ({ measurements, userNippleDistance }: MeasurementDisplayProps) => {
+  // Calculate scale from user input vs detected distance
+  const detectedNippleDistance = measurements.nippleToNippleDistance;
+  const scaleRatio = userNippleDistance ? userNippleDistance / detectedNippleDistance : 1;
+  
+  const scaledMeasurements = {
+    ...measurements,
+    nippleToNippleDistance: userNippleDistance || measurements.nippleToNippleDistance,
+    leftBreastWidth: measurements.leftBreastWidth * scaleRatio,
+    rightBreastWidth: measurements.rightBreastWidth * scaleRatio,
+    leftBreastHeight: measurements.leftBreastHeight * scaleRatio,
+    rightBreastHeight: measurements.rightBreastHeight * scaleRatio,
+    leftBreastProjection: measurements.leftBreastProjection * scaleRatio,
+    rightBreastProjection: measurements.rightBreastProjection * scaleRatio,
+    inframammaryFoldWidth: measurements.inframammaryFoldWidth * scaleRatio,
+    chestWallWidth: measurements.chestWallWidth * scaleRatio,
+  };
   const format = BreastMeasurementAnalyzer.formatMeasurement;
 
   return (
@@ -20,7 +35,7 @@ export const MeasurementDisplay = ({ measurements, modelScale = 10 }: Measuremen
           <Ruler className="h-5 w-5 text-primary" />
           <h3 className="font-semibold text-foreground">Breast Measurements</h3>
           <Badge variant="outline" className="text-xs">
-            Cup Size: {realWorldMeasurements.averageBreastSize}
+            Cup Size: {scaledMeasurements.averageBreastSize}
           </Badge>
         </div>
 
@@ -34,15 +49,15 @@ export const MeasurementDisplay = ({ measurements, modelScale = 10 }: Measuremen
             <div className="pl-6 space-y-1 text-muted-foreground">
               <div className="flex justify-between">
                 <span>Nipple-to-nipple:</span>
-                <span className="font-mono">{format(realWorldMeasurements.nippleToNippleDistance)}</span>
+                <span className="font-mono">{format(scaledMeasurements.nippleToNippleDistance)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Inframammary width:</span>
-                <span className="font-mono">{format(realWorldMeasurements.inframammaryFoldWidth)}</span>
+                <span className="font-mono">{format(scaledMeasurements.inframammaryFoldWidth)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Chest wall width:</span>
-                <span className="font-mono">{format(realWorldMeasurements.chestWallWidth)}</span>
+                <span className="font-mono">{format(scaledMeasurements.chestWallWidth)}</span>
               </div>
             </div>
           </div>
@@ -57,29 +72,29 @@ export const MeasurementDisplay = ({ measurements, modelScale = 10 }: Measuremen
               <div className="text-xs font-medium text-primary">Left Breast</div>
               <div className="flex justify-between text-xs">
                 <span>Width:</span>
-                <span className="font-mono">{format(realWorldMeasurements.leftBreastWidth)}</span>
+                <span className="font-mono">{format(scaledMeasurements.leftBreastWidth)}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span>Height:</span>
-                <span className="font-mono">{format(realWorldMeasurements.leftBreastHeight)}</span>
+                <span className="font-mono">{format(scaledMeasurements.leftBreastHeight)}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span>Projection:</span>
-                <span className="font-mono">{format(realWorldMeasurements.leftBreastProjection)}</span>
+                <span className="font-mono">{format(scaledMeasurements.leftBreastProjection)}</span>
               </div>
               
               <div className="text-xs font-medium text-primary pt-1">Right Breast</div>
               <div className="flex justify-between text-xs">
                 <span>Width:</span>
-                <span className="font-mono">{format(realWorldMeasurements.rightBreastWidth)}</span>
+                <span className="font-mono">{format(scaledMeasurements.rightBreastWidth)}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span>Height:</span>
-                <span className="font-mono">{format(realWorldMeasurements.rightBreastHeight)}</span>
+                <span className="font-mono">{format(scaledMeasurements.rightBreastHeight)}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span>Projection:</span>
-                <span className="font-mono">{format(realWorldMeasurements.rightBreastProjection)}</span>
+                <span className="font-mono">{format(scaledMeasurements.rightBreastProjection)}</span>
               </div>
             </div>
           </div>
@@ -87,12 +102,8 @@ export const MeasurementDisplay = ({ measurements, modelScale = 10 }: Measuremen
 
         <div className="text-xs text-muted-foreground border-t pt-2">
           <div className="flex justify-between">
-            <span>Scale Reference:</span>
-            <span>Nipple-to-nipple distance</span>
-          </div>
-          <div className="flex justify-between">
             <span>Current Cup Size:</span>
-            <span className="font-semibold text-primary">{realWorldMeasurements.averageBreastSize} Cup</span>
+            <span className="font-semibold text-primary">{scaledMeasurements.averageBreastSize} Cup</span>
           </div>
         </div>
       </div>
