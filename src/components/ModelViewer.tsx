@@ -50,6 +50,7 @@ const GeneratedModel = ({
   const groupRef = useRef<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzedModelUrl, setAnalyzedModelUrl] = useState<string>('');
+  const [forceAnalysis, setForceAnalysis] = useState(0);
   const { toast } = useToast();
 
   // Check if it's a blob URL - use directly, otherwise use proxy
@@ -99,7 +100,7 @@ const GeneratedModel = ({
           setIsAnalyzing(false);
         });
     }
-  }, [gltfResult?.scene, isAnalyzing, analyzedModelUrl, finalUrl, onAnalysisComplete]);
+  }, [gltfResult?.scene, isAnalyzing, analyzedModelUrl, finalUrl, onAnalysisComplete, forceAnalysis]);
 
   // Check if the model has loaded successfully
   if (!gltfResult?.scene) {
@@ -262,7 +263,7 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
   useEffect(() => {
     console.log('Model URL effect triggered:', { modelUrl, hasAnalysisData: !!analysisData });
     if (modelUrl) {
-      console.log('Model URL changed, clearing analysis data:', modelUrl);
+      console.log('Model URL changed, clearing analysis data and forcing re-analysis:', modelUrl);
       setAnalysisData(null);
       setShowMarkers(false);
       setShowImplants(false);
