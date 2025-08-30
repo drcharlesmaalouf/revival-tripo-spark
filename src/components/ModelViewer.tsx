@@ -58,6 +58,12 @@ const GeneratedModel = ({
 
   console.log('Loading model:', { original: modelUrl, final: finalUrl, useProxy: shouldUseProxy });
 
+  // Reset analysis state when model changes
+  useEffect(() => {
+    setHasAnalyzed(false);
+    setIsAnalyzing(false);
+  }, [modelUrl]);
+
   // Use useGLTF hook properly - it handles loading states internally
   const gltfResult = useGLTF(finalUrl);
 
