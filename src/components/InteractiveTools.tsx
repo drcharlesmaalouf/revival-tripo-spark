@@ -20,7 +20,7 @@ export const InteractiveTools = ({
   onContourComplete,
   onNipplePlaced 
 }: InteractiveToolsProps) => {
-  const { camera, raycaster, scene, gl } = useThree();
+  const { camera, raycaster, scene, gl, controls } = useThree();
   const [contourPoints, setContourPoints] = useState<ContourPoint[]>([]);
   const [dragState, setDragState] = useState<{
     isDragging: boolean;
@@ -30,20 +30,6 @@ export const InteractiveTools = ({
   
   const contourGroupRef = useRef<THREE.Group>(null);
   const mouseRef = useRef(new THREE.Vector2());
-  const orbitControlsRef = useRef<any>(null);
-
-  // Get reference to OrbitControls
-  useEffect(() => {
-    const controls = gl.domElement.parentElement?.querySelector('div')?.children;
-    if (controls) {
-      // This is a bit hacky, but we need to find the OrbitControls
-      scene.traverse((child) => {
-        if (child.userData.orbitControls) {
-          orbitControlsRef.current = child.userData.orbitControls;
-        }
-      });
-    }
-  }, [gl, scene]);
 
   // Create initial circle when entering contour mode
   useEffect(() => {
@@ -69,12 +55,13 @@ export const InteractiveTools = ({
       
       const position = new THREE.Vector3(x, y, z);
       
-      // Create visible handle
-      const handleGeometry = new THREE.SphereGeometry(0.02, 16, 16);
-      const handleMaterial = new THREE.MeshBasicMaterial({ 
+      // Create visible handle (much smaller)
+      const handleGeometry = new THREE.SphereGeometry(0.008, 12, 12); // Reduced from 0.02 to 0.008
+      const handleMaterial = new THREE.MeshStandardMaterial({ 
         color: mode === 'leftContour' ? 0xff69b4 : 0x4169e1,
         transparent: true,
-        opacity: 0.8
+        opacity: 0.9,
+        emissive: 0x000000
       });
       const handleMesh = new THREE.Mesh(handleGeometry, handleMaterial);
       handleMesh.position.copy(position);
@@ -157,12 +144,10 @@ export const InteractiveTools = ({
       const pointIndex = contourPoints.findIndex(p => p.mesh === clickedMesh);
       
       if (pointIndex !== -1) {
-        // Disable OrbitControls during dragging
-        const canvas = gl.domElement;
-        canvas.style.pointerEvents = 'none';
-        setTimeout(() => {
-          canvas.style.pointerEvents = 'auto';
-        }, 0);
+        // COMPLETELY disable OrbitControls during dragging
+        if (controls && 'enabled' in controls) {
+          (controls as any).enabled = false;
+        }
         
         setDragState({
           isDragging: true,
@@ -170,15 +155,18 @@ export const InteractiveTools = ({
           offset: new THREE.Vector3()
         });
         
-        // Change handle appearance
-        (clickedMesh.material as THREE.MeshBasicMaterial).opacity = 1.0;
+        // Change handle appearance (make brighter and slightly larger)
+        const material = clickedMesh.material as THREE.MeshStandardMaterial;
+        material.opacity = 1.0;
+        material.emissive.setHex(0x444444); // Add glow effect
+        clickedMesh.scale.setScalar(1.5); // Make slightly larger when dragging
         
-        // Prevent event bubbling to OrbitControls
+        // Prevent any event bubbling
         event.stopPropagation();
         event.preventDefault();
       }
     }
-  }, [mode, contourPoints, camera, raycaster, gl]);
+  }, [mode, contourPoints, camera, raycaster, controls]);
 
   const handleMouseMove = useCallback((event: MouseEvent) => {
     if (!dragState.isDragging || dragState.pointIndex === null) return;
@@ -227,15 +215,19 @@ export const InteractiveTools = ({
     if (dragState.isDragging && dragState.pointIndex !== null) {
       // Reset handle appearance
       const handle = contourPoints[dragState.pointIndex].mesh;
-      (handle.material as THREE.MeshBasicMaterial).opacity = 0.8;
+      const material = handle.material as THREE.MeshStandardMaterial;
+      material.opacity = 0.9;
+      material.emissive.setHex(0x000000); // Remove glow
+      handle.scale.setScalar(1.0); // Reset size
       
       // Re-enable OrbitControls
-      const canvas = gl.domElement;
-      canvas.style.pointerEvents = 'auto';
+      if (controls && 'enabled' in controls) {
+        (controls as any).enabled = true;
+      }
     }
     
     setDragState({ isDragging: false, pointIndex: null, offset: new THREE.Vector3() });
-  }, [dragState, contourPoints, gl]);
+  }, [dragState, contourPoints, controls]);
 
   const handleNipplePlacement = useCallback((event: MouseEvent) => {
     const canvas = event.target as HTMLCanvasElement;
@@ -298,36 +290,20 @@ export const InteractiveTools = ({
     clearContour();
   }, [contourPoints, mode, onContourComplete, clearContour]);
 
-  // Event listeners with proper event handling
+  // Simplified event listeners 
   useEffect(() => {
     const canvas = gl.domElement;
     
-    const handleMouseDownWithCapture = (e: MouseEvent) => {
-      handleMouseDown(e);
-    };
-    
-    const handleMouseMoveWithCapture = (e: MouseEvent) => {
-      if (dragState.isDragging) {
-        e.stopPropagation();
-        e.preventDefault();
-      }
-      handleMouseMove(e);
-    };
-    
-    const handleMouseUpWithCapture = (e: MouseEvent) => {
-      handleMouseUp();
-    };
-    
-    canvas.addEventListener('mousedown', handleMouseDownWithCapture, { capture: true });
-    canvas.addEventListener('mousemove', handleMouseMoveWithCapture, { capture: true });
-    canvas.addEventListener('mouseup', handleMouseUpWithCapture, { capture: true });
+    canvas.addEventListener('mousedown', handleMouseDown);
+    canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('mouseup', handleMouseUp);
     
     return () => {
-      canvas.removeEventListener('mousedown', handleMouseDownWithCapture, { capture: true });
-      canvas.removeEventListener('mousemove', handleMouseMoveWithCapture, { capture: true });
-      canvas.removeEventListener('mouseup', handleMouseUpWithCapture, { capture: true });
+      canvas.removeEventListener('mousedown', handleMouseDown);
+      canvas.removeEventListener('mousemove', handleMouseMove);
+      canvas.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [handleMouseDown, handleMouseMove, handleMouseUp, gl, dragState.isDragging]);
+  }, [handleMouseDown, handleMouseMove, handleMouseUp, gl]);
 
   // Keyboard shortcuts
   useEffect(() => {
