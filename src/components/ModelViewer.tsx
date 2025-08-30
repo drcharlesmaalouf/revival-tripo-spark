@@ -226,13 +226,28 @@ const Scene = forwardRef<any, {
         <group>
           <GeneratedModel modelUrl={modelUrl} onSceneLoaded={onSceneLoaded} />
           {/* Add visualization markers on top when analysis is complete */}
-          {meshAnalysisResults && showVisualization && meshAnalysisResults.landmarks && (
-            <primitive
-              object={BreastDetector.createVisualizationMarkers(meshAnalysisResults.landmarks)}
-              scale={[10, 10, 10]}
-              position={[0, 0, 0]}
-            />
-          )}
+          {(() => {
+            console.log('=== VISUALIZATION RENDER CHECK ===');
+            console.log('- meshAnalysisResults:', !!meshAnalysisResults);
+            console.log('- showVisualization:', showVisualization);
+            console.log('- landmarks:', !!meshAnalysisResults?.landmarks);
+            console.log('- leftNipple:', !!meshAnalysisResults?.landmarks?.leftNipple);
+            console.log('- rightNipple:', !!meshAnalysisResults?.landmarks?.rightNipple);
+            
+            if (meshAnalysisResults && showVisualization && meshAnalysisResults.landmarks) {
+              console.log('Creating visualization markers...');
+              const markers = BreastDetector.createVisualizationMarkers(meshAnalysisResults.landmarks);
+              console.log('Markers created:', markers);
+              return (
+                <primitive
+                  object={markers}
+                  scale={[10, 10, 10]}
+                  position={[0, 0, 0]}
+                />
+              );
+            }
+            return null;
+          })()}
         </group>
       ) : (
         <PlaceholderModel />
@@ -468,7 +483,13 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
               <Button
                 variant={showVisualization ? "default" : "secondary"}
                 size="sm"
-                onClick={() => setShowVisualization(!showVisualization)}
+                onClick={() => {
+                  console.log('=== EYE BUTTON CLICKED ===');
+                  console.log('Current showVisualization:', showVisualization);
+                  console.log('meshAnalysisResults:', !!meshAnalysisResults);
+                  setShowVisualization(!showVisualization);
+                  console.log('New showVisualization:', !showVisualization);
+                }}
                 disabled={!meshAnalysisResults}
               >
                 {showVisualization ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
