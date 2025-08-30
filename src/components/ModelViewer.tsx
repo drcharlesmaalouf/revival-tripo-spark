@@ -1,4 +1,4 @@
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useRef, useState, useEffect } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Environment, Box, useGLTF } from "@react-three/drei";
 import { Mesh, Box3, Vector3 } from "three";
@@ -26,32 +26,63 @@ const PlaceholderModel = () => {
 
 const GeneratedModel = ({ modelUrl }: { modelUrl: string }) => {
   const groupRef = useRef<any>(null);
+  const [loadError, setLoadError] = useState(false);
 
   console.log('Loading model from URL:', modelUrl);
   
+  // Add error boundary for model loading
   let gltfResult = null;
   try {
     gltfResult = useGLTF(modelUrl);
     console.log('GLTF loaded successfully:', gltfResult);
+    setLoadError(false);
   } catch (error) {
     console.error('Error loading GLTF model:', error);
+    setLoadError(true);
+    return <PlaceholderModel />;
+  }
+
+  // Check if URL is accessible
+  useEffect(() => {
+    if (modelUrl) {
+      fetch(modelUrl, { method: 'HEAD' })
+        .then(response => {
+          if (!response.ok) {
+            console.error('Model URL not accessible:', response.status, response.statusText);
+            setLoadError(true);
+          }
+        })
+        .catch(error => {
+          console.error('Error checking model URL:', error);
+          setLoadError(true);
+        });
+    }
+  }, [modelUrl]);
+
+  if (loadError) {
+    console.log('Load error detected, showing placeholder');
     return <PlaceholderModel />;
   }
 
   if (gltfResult?.scene) {
     console.log('GLTF scene found, setting up model');
-    // Scale and center the model
-    const box = new Box3().setFromObject(gltfResult.scene);
-    const center = box.getCenter(new Vector3());
-    const size = box.getSize(new Vector3());
-    
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const scale = 3 / maxDim; // Scale to fit in a 3x3x3 space
-    
-    gltfResult.scene.scale.setScalar(scale);
-    gltfResult.scene.position.copy(center.multiplyScalar(-scale));
+    try {
+      // Scale and center the model
+      const box = new Box3().setFromObject(gltfResult.scene);
+      const center = box.getCenter(new Vector3());
+      const size = box.getSize(new Vector3());
+      
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const scale = maxDim > 0 ? 3 / maxDim : 1; // Prevent division by zero
+      
+      gltfResult.scene.scale.setScalar(scale);
+      gltfResult.scene.position.copy(center.multiplyScalar(-scale));
 
-    return <primitive ref={groupRef} object={gltfResult.scene} />;
+      return <primitive ref={groupRef} object={gltfResult.scene} />;
+    } catch (error) {
+      console.error('Error setting up 3D model:', error);
+      return <PlaceholderModel />;
+    }
   }
 
   console.log('No GLTF scene found, showing placeholder');
