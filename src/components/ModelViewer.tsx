@@ -37,28 +37,22 @@ const PlaceholderModel = () => {
 const GeneratedModel = ({ modelUrl }: { modelUrl: string }) => {
   const groupRef = useRef<any>(null);
 
-  // Try to load via proxy first, then fallback to direct URL
-  const proxyUrl = `https://jdjdwysfkjqgfdidcmnh.supabase.co/functions/v1/proxy-model?url=${encodeURIComponent(modelUrl)}`;
+  // Check if it's a blob URL - use directly, otherwise use proxy
+  const shouldUseProxy = !modelUrl.startsWith('blob:') && !modelUrl.startsWith('data:');
+  const finalUrl = shouldUseProxy 
+    ? `https://jdjdwysfkjqgfdidcmnh.supabase.co/functions/v1/proxy-model?url=${encodeURIComponent(modelUrl)}`
+    : modelUrl;
 
-  // Remove auto-rotation - users can rotate manually with mouse
-  // useFrame(() => {
-  //   if (groupRef.current) {
-  //     groupRef.current.rotation.y += 0.005;
-  //   }
-  // });
+  console.log('Loading model:', { original: modelUrl, final: finalUrl, useProxy: shouldUseProxy });
 
   // Try loading with useGLTF - handle errors gracefully
   let gltfResult = null;
   try {
-    gltfResult = useGLTF(proxyUrl);
-  } catch (proxyError) {
-    console.log('Proxy failed, trying direct URL');
-    try {
-      gltfResult = useGLTF(modelUrl);
-    } catch (directError) {
-      console.error('Both proxy and direct loading failed');
-      // Don't use setState here - just return fallback component
-    }
+    gltfResult = useGLTF(finalUrl);
+    console.log('Model loaded successfully');
+  } catch (error) {
+    console.error('Model loading failed:', error);
+    // Return fallback component
   }
 
   if (!gltfResult?.scene) {
