@@ -45,17 +45,10 @@ const GeneratedModel = ({ modelUrl }: { modelUrl: string }) => {
 
   console.log('Loading model:', { original: modelUrl, final: finalUrl, useProxy: shouldUseProxy });
 
-  // Try loading with useGLTF - handle errors gracefully
-  let gltfResult = null;
-  try {
-    gltfResult = useGLTF(finalUrl);
-    console.log('Model loaded successfully:', gltfResult);
-  } catch (error) {
-    console.error('Model loading failed:', error);
-    console.error('Failed URL:', finalUrl);
-    // Return fallback component
-  }
+  // Use useGLTF hook properly - it handles loading states internally
+  const gltfResult = useGLTF(finalUrl);
 
+  // Check if the model has loaded successfully
   if (!gltfResult?.scene) {
     console.log('No GLTF scene found - showing green cube fallback');
     return (
@@ -68,6 +61,8 @@ const GeneratedModel = ({ modelUrl }: { modelUrl: string }) => {
       </Box>
     );
   }
+
+  console.log('Model loaded successfully:', gltfResult);
 
   return (
     <group ref={groupRef}>
