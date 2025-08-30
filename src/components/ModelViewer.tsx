@@ -138,11 +138,15 @@ const Scene = forwardRef<any, {
         <PlaceholderModel />
       )}
 
-      {/* Show color-coded analysis mesh in fullscreen when markers enabled */}
-      {isFullscreen && showMarkers && analysisData?.analyzedMesh && (
+      {/* Show marker-based detection instead of mesh modification */}
+      {isFullscreen && showMarkers && analysisData && (
         <>
-          {console.log('RENDERING COLOR MESH!')}
-          <primitive object={analysisData.analyzedMesh} />
+          {console.log('SHOWING DETECTION MARKERS!')}
+          {/* Simple sphere markers for detected areas */}
+          <AnatomicalMarkers 
+            landmarks={analysisData.landmarks} 
+            showMarkers={true} 
+          />
         </>
       )}
 
