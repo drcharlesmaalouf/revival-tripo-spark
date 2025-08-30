@@ -2,7 +2,7 @@ import { Suspense, useRef, useImperativeHandle, forwardRef, useState, useEffect 
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Environment, Box, useGLTF } from "@react-three/drei";
 import { Mesh } from "three";
-import { Download, RotateCcw, Maximize2, X, Move, Eye, EyeOff } from "lucide-react";
+import { Download, RotateCcw, Maximize2, X, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { anatomicalAnalyzer, AnatomicalLandmarks, BreastMeshData } from "@/lib/anatomicalAnalysis";
@@ -16,18 +16,8 @@ interface ModelViewerProps {
   modelUrl?: string;
 }
 
-// Remove auto-rotation from placeholder too
 const PlaceholderModel = () => {
   const meshRef = useRef<Mesh>(null);
-
-  // Remove auto-rotation - keep it static
-  // useFrame((state) => {
-  //   if (meshRef.current) {
-  //     meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime) * 0.2;
-  //     meshRef.current.rotation.y += 0.01;
-  //   }
-  // });
-
   return (
     <Box ref={meshRef} args={[2, 2, 2]}>
       <meshStandardMaterial
@@ -39,7 +29,6 @@ const PlaceholderModel = () => {
   );
 };
 
-// Enhanced Generated 3D model component with anatomical analysis
 const GeneratedModel = ({ 
   modelUrl, 
   onAnalysisComplete 
@@ -50,10 +39,8 @@ const GeneratedModel = ({
   const groupRef = useRef<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzedModelUrl, setAnalyzedModelUrl] = useState<string>('');
-  const [forceAnalysis, setForceAnalysis] = useState(0);
   const { toast } = useToast();
 
-  // Check if it's a blob URL - use directly, otherwise use proxy
   const shouldUseProxy = !modelUrl.startsWith('blob:') && !modelUrl.startsWith('data:');
   const finalUrl = shouldUseProxy 
     ? `https://jdjdwysfkjqgfdidcmnh.supabase.co/functions/v1/proxy-model?url=${encodeURIComponent(modelUrl)}`
@@ -61,10 +48,9 @@ const GeneratedModel = ({
 
   console.log('Loading model:', { original: modelUrl, final: finalUrl, useProxy: shouldUseProxy });
 
-  // Use useGLTF hook properly - it handles loading states internally
   const gltfResult = useGLTF(finalUrl);
 
-  // Perform anatomical analysis when model loads - STOP INFINITE LOOP
+  // Perform anatomical analysis - FIXED DEPENDENCIES
   useEffect(() => {
     const modelAlreadyAnalyzed = analyzedModelUrl === finalUrl;
     
@@ -90,15 +76,10 @@ const GeneratedModel = ({
           setIsAnalyzing(false);
         });
     }
-  }, [finalUrl]); // ONLY depend on finalUrl to stop loops
+  }, [finalUrl]); // ONLY finalUrl dependency to avoid loops
 
-  // Check if the model has loaded successfully
   if (!gltfResult?.scene) {
-    console.log('No GLTF scene found - showing green cube fallback', {
-      gltfResult,
-      modelUrl: finalUrl,
-      isBlob: modelUrl.startsWith('blob:')
-    });
+    console.log('No GLTF scene found - showing green cube fallback');
     return (
       <Box args={[1.5, 1.5, 1.5]}>
         <meshStandardMaterial
@@ -119,12 +100,6 @@ const GeneratedModel = ({
         scale={[10, 10, 10]}
         position={[0, 0, 0]}
       />
-      {isAnalyzing && (
-        <mesh position={[0, 2, 0]}>
-          <boxGeometry args={[0.1, 0.1, 0.1]} />
-          <meshBasicMaterial color="#ffff00" />
-        </mesh>
-      )}
     </group>
   );
 };
@@ -162,22 +137,15 @@ const Scene = forwardRef<any, {
         <PlaceholderModel />
       )}
 
-      {/* Show color-coded mesh when enabled - ALWAYS try to render if showMarkers is true */}
-      {isFullscreen && showMarkers && (
+      {/* Show color-coded analysis mesh in fullscreen when markers enabled */}
+      {isFullscreen && showMarkers && analysisData?.analyzedMesh && (
         <>
-          {console.log('ATTEMPTING TO RENDER COLOR MESH - showMarkers:', showMarkers, 'analysisData:', !!analysisData, 'analyzedMesh:', !!analysisData?.analyzedMesh)}
-          {analysisData?.analyzedMesh ? (
-            <primitive object={analysisData.analyzedMesh} />
-          ) : (
-            <mesh>
-              <boxGeometry args={[0.1, 0.1, 0.1]} />
-              <meshBasicMaterial color="red" />
-            </mesh>
-          )}
+          {console.log('RENDERING COLOR MESH!')}
+          <primitive object={analysisData.analyzedMesh} />
         </>
       )}
 
-      {/* Anatomical markers and implants overlay - only show in fullscreen */}
+      {/* Show markers and implants in fullscreen */}
       {isFullscreen && analysisData && (
         <>
           {showMarkers && (
@@ -221,13 +189,6 @@ const Scene = forwardRef<any, {
 export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
   const sceneRef = useRef<any>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [windowPosition, setWindowPosition] = useState({ x: 50, y: 50 });
-  const [windowSize, setWindowSize] = useState({ width: 800, height: 600 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
-  const windowRef = useRef<HTMLDivElement>(null);
   
   // Anatomical analysis state
   const [analysisData, setAnalysisData] = useState<BreastMeshData | null>(null);
@@ -245,11 +206,11 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
     });
   };
 
-  // Clear analysis data when model changes and force re-analysis
+  // Clear analysis data when model changes
   useEffect(() => {
     console.log('Model URL effect triggered:', { modelUrl, hasAnalysisData: !!analysisData });
     if (modelUrl) {
-      console.log('Model URL changed, clearing analysis data and forcing re-analysis:', modelUrl);
+      console.log('Model URL changed, clearing analysis data:', modelUrl);
       setAnalysisData(null);
       setShowMarkers(false);
       setShowImplants(false);
@@ -276,82 +237,11 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
 
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen);
-    if (!isFullscreen) {
-      // Reset position and size when opening
-      setWindowPosition({ x: 50, y: 50 });
-      setWindowSize({ width: 800, height: 600 });
-    }
   };
 
   const closeFullscreen = () => {
     setIsFullscreen(false);
   };
-
-  // Handle dragging
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(true);
-    setDragStart({
-      x: e.clientX - windowPosition.x,
-      y: e.clientY - windowPosition.y,
-    });
-  };
-
-  // Handle resizing
-  const handleResizeMouseDown = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsResizing(true);
-    setResizeStart({
-      x: e.clientX,
-      y: e.clientY,
-      width: windowSize.width,
-      height: windowSize.height,
-    });
-  };
-
-  const handleMouseMove = (e: MouseEvent) => {
-    if (isDragging) {
-      const newX = Math.max(0, Math.min(window.innerWidth - windowSize.width, e.clientX - dragStart.x));
-      const newY = Math.max(0, Math.min(window.innerHeight - windowSize.height, e.clientY - dragStart.y));
-      setWindowPosition({ x: newX, y: newY });
-    }
-
-    if (isResizing) {
-      const deltaX = e.clientX - resizeStart.x;
-      const deltaY = e.clientY - resizeStart.y;
-
-      const newWidth = Math.max(400, Math.min(window.innerWidth - windowPosition.x, resizeStart.width + deltaX));
-      const newHeight = Math.max(300, Math.min(window.innerHeight - windowPosition.y, resizeStart.height + deltaY));
-
-      setWindowSize({ width: newWidth, height: newHeight });
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    setIsResizing(false);
-  };
-
-  // Handle escape key and mouse events
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isFullscreen) {
-        setIsFullscreen(false);
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-
-    if (isDragging || isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isFullscreen, isDragging, isResizing, dragStart, resizeStart, windowPosition, windowSize]);
 
   return (
     <>
@@ -366,41 +256,21 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
             far: 1000
           }}
           style={{ background: "transparent" }}
-          onCreated={({ gl }) => {
-            // Handle WebGL context loss
-            gl.domElement.addEventListener('webglcontextlost', (event) => {
-              console.warn('WebGL context lost, preventing default and attempting recovery');
-              event.preventDefault();
-              toast({
-                title: "Display Issue",
-                description: "3D viewer context lost. Refreshing...",
-                variant: "destructive"
-              });
-            });
-            
-            gl.domElement.addEventListener('webglcontextrestored', () => {
-              console.log('WebGL context restored');
-              toast({
-                title: "Display Restored",
-                description: "3D viewer is working again.",
-              });
-            });
-          }}
         >
           <Suspense fallback={null}>
             <Scene 
               ref={sceneRef} 
               modelUrl={modelUrl} 
               analysisData={analysisData}
-              showMarkers={showMarkers}
-              showImplants={showImplants}
+              showMarkers={false}
+              showImplants={false}
               onAnalysisComplete={handleAnalysisComplete}
               isFullscreen={false}
             />
           </Suspense>
         </Canvas>
 
-        {/* Control Panel - Simple controls only */}
+        {/* Normal viewer controls */}
         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2">
           <Button
             variant="secondary"
@@ -452,167 +322,101 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
         )}
       </div>
 
-          {/* Fullscreen draggable & resizable window */}
+      {/* FULLSCREEN MODAL */}
       {isFullscreen && (
-        <>
-          {/* Background overlay */}
-          <div className="fixed inset-0 bg-black/20 z-40" onClick={closeFullscreen} />
+        <div className="fixed inset-0 z-50 bg-background">
+          {/* Header with close button */}
+          <div className="absolute top-0 left-0 right-0 z-60 bg-muted border-b p-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold">3D Model Analysis</h2>
+            <Button variant="ghost" size="sm" onClick={closeFullscreen}>
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
 
-          {/* Fullscreen window - occupy entire screen */}
-          <div
-            ref={windowRef}
-            className="fixed inset-0 z-50 bg-background overflow-hidden"
-          >
-            {/* Window header */}
-            <div
-              className="flex items-center justify-between p-3 bg-muted border-b cursor-move select-none"
-              onMouseDown={handleMouseDown}
+          {/* Main 3D viewer area */}
+          <div className="absolute inset-0 pt-16 bg-gradient-secondary">
+            <Canvas
+              camera={{ 
+                position: [1, 0.5, 1], 
+                fov: 75,
+                near: 0.001,
+                far: 1000
+              }}
+              style={{ background: "transparent" }}
             >
-              <div className="flex items-center gap-2">
-                <Move className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-medium">3D Model Viewer</span>
-                <span className="text-xs text-muted-foreground">
-                  {windowSize.width} × {windowSize.height}
-                </span>
-              </div>
+              <Suspense fallback={null}>
+                <Scene 
+                  ref={sceneRef} 
+                  modelUrl={modelUrl} 
+                  analysisData={analysisData}
+                  showMarkers={showMarkers}
+                  showImplants={showImplants}
+                  onAnalysisComplete={handleAnalysisComplete}
+                  isFullscreen={true}
+                />
+              </Suspense>
+            </Canvas>
+          </div>
+
+          {/* CONTROL BUTTONS - ALWAYS VISIBLE */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-60">
+            <div className="flex gap-2 bg-background/95 backdrop-blur-sm rounded-lg p-3 border shadow-lg">
               <Button
-                variant="ghost"
+                variant="secondary"
                 size="sm"
-                onClick={closeFullscreen}
-                className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                onClick={handleReset}
               >
-                <X className="w-4 h-4" />
+                <RotateCcw className="w-4 h-4" />
               </Button>
-            </div>
 
-            {/* Window content - full height */}
-            <div className="relative bg-gradient-secondary h-full">
-              <Canvas
-                camera={{ 
-                  position: [1, 0.5, 1], 
-                  fov: 75,
-                  near: 0.001,
-                  far: 1000
-                }}
-                style={{ background: "transparent" }}
-                onCreated={({ gl }) => {
-                  // Handle WebGL context loss for fullscreen viewer too
-                  gl.domElement.addEventListener('webglcontextlost', (event) => {
-                    console.warn('WebGL context lost in fullscreen viewer');
-                    event.preventDefault();
-                  });
+              <Button
+                variant={showMarkers ? "default" : "secondary"}
+                size="sm"
+                onClick={() => {
+                  console.log('EYE BUTTON CLICKED! showMarkers:', showMarkers, '-> ', !showMarkers);
+                  setShowMarkers(!showMarkers);
                 }}
               >
-                <Suspense fallback={null}>
-                  <Scene 
-                    ref={sceneRef} 
-                    modelUrl={modelUrl} 
-                    analysisData={analysisData}
-                    showMarkers={showMarkers}
-                    showImplants={showImplants}
-                    onAnalysisComplete={handleAnalysisComplete}
-                    isFullscreen={true}
-                  />
-                </Suspense>
-              </Canvas>
+                {showMarkers ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              </Button>
 
-              {/* Analysis controls in fullscreen - bottom center */}
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2">
+              <Button
+                variant={showImplants ? "default" : "secondary"}
+                size="sm"
+                onClick={() => setShowImplants(!showImplants)}
+              >
+                <span className="w-4 h-4 text-xs font-bold">300</span>
+              </Button>
+
+              {modelUrl && (
                 <Button
-                  variant="secondary"
+                  variant="default"
                   size="sm"
-                  onClick={handleReset}
-                  className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
+                  onClick={handleDownload}
                 >
-                  <RotateCcw className="w-4 h-4" />
+                  <Download className="w-4 h-4 mr-2" />
+                  Download
                 </Button>
-
-                <Button
-                  variant={showMarkers ? "default" : "secondary"}
-                  size="sm"
-                  onClick={() => {
-                    console.log('Eye button clicked! showMarkers:', showMarkers, '-> ', !showMarkers);
-                    setShowMarkers(!showMarkers);
-                  }}
-                  className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
-                >
-                  {showMarkers ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                </Button>
-
-                <Button
-                  variant={showImplants ? "default" : "secondary"}
-                  size="sm"
-                  onClick={() => setShowImplants(!showImplants)}
-                  className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
-                >
-                  <span className="w-4 h-4 text-xs font-bold">300</span>
-                </Button>
-
-                {modelUrl && (
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={handleDownload}
-                    className="bg-primary/90 backdrop-blur-sm hover:bg-primary"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Download
-                  </Button>
-                )}
-              </div>
-
-              {/* Measurement Display in fullscreen - bottom right */}
-              {analysisData && (
-                <div className="absolute bottom-16 right-4 max-w-sm">
-                  <div className="space-y-2">
-                    <ScaleInput 
-                      onScaleSet={setUserNippleDistance}
-                      currentScale={userNippleDistance}
-                    />
-                    <MeasurementDisplay 
-                      measurements={analysisData.measurements}
-                      userNippleDistance={userNippleDistance}
-                    />
-                    
-                    {/* Color legend for analysis visualization */}
-                    {analysisData.analyzedMesh && (
-                      <div className="bg-background/90 backdrop-blur-sm rounded-lg p-3 text-sm border border-border">
-                        <h4 className="font-semibold mb-2 text-foreground">Breast Detection Analysis</h4>
-                        <div className="space-y-1 text-xs">
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                            <span className="text-muted-foreground">Nipples detected</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-pink-400 rounded-full"></div>
-                            <span className="text-muted-foreground">Left breast region</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-purple-400 rounded-full"></div>
-                            <span className="text-muted-foreground">Right breast region</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
-                            <span className="text-muted-foreground">Other areas</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
               )}
             </div>
-
-            {/* Resize handle - bottom-right corner */}
-            <div
-              className="absolute bottom-0 right-0 w-4 h-4 cursor-nw-resize bg-primary/20 hover:bg-primary/40 transition-colors"
-              onMouseDown={handleResizeMouseDown}
-              style={{
-                background: 'linear-gradient(-45deg, transparent 40%, currentColor 40%, currentColor 60%, transparent 60%)',
-              }}
-            />
           </div>
-        </>
+
+          {/* Measurement panels - bottom right */}
+          {analysisData && (
+            <div className="absolute bottom-4 right-4 z-60 max-w-sm">
+              <div className="space-y-2">
+                <ScaleInput 
+                  onScaleSet={setUserNippleDistance}
+                  currentScale={userNippleDistance}
+                />
+                <MeasurementDisplay 
+                  measurements={analysisData.measurements}
+                  userNippleDistance={userNippleDistance}
+                />
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </>
   );
