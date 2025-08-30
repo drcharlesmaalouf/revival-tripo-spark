@@ -274,28 +274,38 @@ export class BreastDetector {
       colors[i * 3 + 2] = 0.8; // B
     }
     
-    // Color breast regions
+    // Color breast regions - check if index exists in the geometry
     const colorRegion = (region: BreastRegion | null, color: [number, number, number]) => {
       if (!region) return;
       
+      let coloredCount = 0;
       region.vertices.forEach(vertex => {
         const idx = vertex.index;
-        colors[idx * 3] = color[0];
-        colors[idx * 3 + 1] = color[1];
-        colors[idx * 3 + 2] = color[2];
+        // Ensure the index is valid for the current geometry
+        if (idx >= 0 && idx < positions.count) {
+          colors[idx * 3] = color[0];
+          colors[idx * 3 + 1] = color[1];
+          colors[idx * 3 + 2] = color[2];
+          coloredCount++;
+        }
       });
+      
+      console.log(`Colored ${coloredCount} vertices for region with ${region.vertices.length} total vertices`);
     };
     
     // Color left breast pink, right breast blue
-    colorRegion(landmarks.leftBreastRegion, [1.0, 0.7, 0.8]);
-    colorRegion(landmarks.rightBreastRegion, [0.7, 0.8, 1.0]);
+    colorRegion(landmarks.leftBreastRegion, [1.0, 0.4, 0.7]);  // More vibrant pink
+    colorRegion(landmarks.rightBreastRegion, [0.3, 0.6, 1.0]); // More vibrant blue
     
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     
-    // Create material with vertex colors
+    // Create material with vertex colors and proper settings
     const material = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      side: THREE.DoubleSide
+      side: THREE.DoubleSide,
+      wireframe: false,
+      transparent: false,
+      opacity: 1.0
     });
     
     visualMesh.material = material;
