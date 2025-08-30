@@ -18,6 +18,8 @@ interface DrawingInterfaceProps {
   scene: THREE.Group | null;
   onMeasurementsComplete: (measurements: CalculatedMeasurements) => void;
   onModeChange: (mode: 'leftContour' | 'rightContour' | 'leftNipple' | 'rightNipple' | 'none') => void;
+  onContourComplete?: (contour: BreastContour) => void;
+  onNipplePlaced?: (nipple: NippleMarker) => void;
 }
 
 type DrawingMode = 'leftContour' | 'rightContour' | 'leftNipple' | 'rightNipple' | 'none';
@@ -25,7 +27,9 @@ type DrawingMode = 'leftContour' | 'rightContour' | 'leftNipple' | 'rightNipple'
 export const DrawingInterface = ({ 
   scene, 
   onMeasurementsComplete,
-  onModeChange 
+  onModeChange,
+  onContourComplete,
+  onNipplePlaced 
 }: DrawingInterfaceProps) => {
   const [currentMode, setCurrentMode] = useState<DrawingMode>('none');
   const [annotations, setAnnotations] = useState<ManualMeasurements>({
@@ -89,13 +93,16 @@ export const DrawingInterface = ({
       [contour.id === 'left' ? 'leftContour' : 'rightContour']: contour
     }));
     
+    // Call parent handler
+    onContourComplete?.(contour);
+    
     // Auto-advance to next mode
     if (contour.id === 'left') {
       setCurrentMode('rightContour');
     } else {
       setCurrentMode('leftNipple');
     }
-  }, []);
+  }, [onContourComplete]);
 
   const handleNipplePlaced = useCallback((nipple: NippleMarker) => {
     setAnnotations(prev => ({
@@ -103,13 +110,16 @@ export const DrawingInterface = ({
       [nipple.id === 'left' ? 'leftNipple' : 'rightNipple']: nipple
     }));
 
+    // Call parent handler
+    onNipplePlaced?.(nipple);
+
     // Auto-advance to next mode
     if (nipple.id === 'left') {
       setCurrentMode('rightNipple');
     } else {
       setCurrentMode('none');
     }
-  }, []);
+  }, [onNipplePlaced]);
 
   const handleDistanceSubmit = useCallback(() => {
     const distance = parseFloat(nippleDistance);

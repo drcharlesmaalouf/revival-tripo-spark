@@ -208,6 +208,12 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
   const [calculatedMeasurements, setCalculatedMeasurements] = useState<CalculatedMeasurements | null>(null);
   const [drawingMode, setDrawingMode] = useState<'leftContour' | 'rightContour' | 'leftNipple' | 'rightNipple' | 'none'>('none');
   
+  // Drawing interface state
+  const [drawingInterfaceRef, setDrawingInterfaceRef] = useState<{
+    handleContourComplete: (contour: BreastContour) => void;
+    handleNipplePlaced: (nipple: NippleMarker) => void;
+  } | null>(null);
+  
   const { toast } = useToast();
 
   // Reset state when URL changes
@@ -229,11 +235,15 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
 
   const handleContourComplete = useCallback((contour: BreastContour) => {
     console.log('Contour completed:', contour);
-  }, []);
+    // Pass to drawing interface if available
+    drawingInterfaceRef?.handleContourComplete(contour);
+  }, [drawingInterfaceRef]);
 
   const handleNipplePlaced = useCallback((nipple: NippleMarker) => {
     console.log('Nipple placed:', nipple);
-  }, []);
+    // Pass to drawing interface if available
+    drawingInterfaceRef?.handleNipplePlaced(nipple);
+  }, [drawingInterfaceRef]);
 
   const handleSceneLoaded = useCallback((scene: THREE.Group) => {
     console.log('Scene loaded in ModelViewer:', scene);
@@ -384,6 +394,8 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
               scene={loadedScene}
               onMeasurementsComplete={handleMeasurementsComplete}
               onModeChange={setDrawingMode}
+              onContourComplete={handleContourComplete}
+              onNipplePlaced={handleNipplePlaced}
             />
           )}
 
