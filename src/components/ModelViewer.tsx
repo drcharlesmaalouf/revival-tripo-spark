@@ -6,7 +6,8 @@ import { Download, RotateCcw, Maximize2, X, Eye, EyeOff, Settings } from "lucide
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { ManualBreastAnnotation } from "./ManualBreastAnnotation";
-import { CalculatedMeasurements } from "@/lib/manualMeasurements";
+import { InteractiveTools } from "./InteractiveTools";
+import { CalculatedMeasurements, BreastContour, NippleMarker } from "@/lib/manualMeasurements";
 import * as THREE from "three";
 
 interface ModelViewerProps {
@@ -148,7 +149,10 @@ const Scene = forwardRef<any, {
   modelUrl?: string; 
   isFullscreen?: boolean;
   onSceneLoaded?: (scene: THREE.Group) => void;
-}>(({ modelUrl, isFullscreen = false, onSceneLoaded }, ref) => {
+  interactionMode?: 'leftContour' | 'rightContour' | 'leftNipple' | 'rightNipple' | 'none';
+  onContourComplete?: (contour: BreastContour) => void;
+  onNipplePlaced?: (nipple: NippleMarker) => void;
+}>(({ modelUrl, isFullscreen = false, onSceneLoaded, interactionMode = 'none', onContourComplete, onNipplePlaced }, ref) => {
   const controlsRef = useRef<any>(null);
 
   useImperativeHandle(ref, () => ({
@@ -166,7 +170,16 @@ const Scene = forwardRef<any, {
       <directionalLight position={[-10, -10, -5]} intensity={0.5} />
 
       {modelUrl ? (
-        <GeneratedModel modelUrl={modelUrl} onSceneLoaded={onSceneLoaded} />
+        <>
+          <GeneratedModel modelUrl={modelUrl} onSceneLoaded={onSceneLoaded} />
+          {isFullscreen && (
+            <InteractiveTools
+              mode={interactionMode}
+              onContourComplete={onContourComplete || (() => {})}
+              onNipplePlaced={onNipplePlaced || (() => {})}
+            />
+          )}
+        </>
       ) : (
         <PlaceholderModel />
       )}
@@ -192,6 +205,7 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
   
   // Manual measurement state
   const [calculatedMeasurements, setCalculatedMeasurements] = useState<CalculatedMeasurements | null>(null);
+  const [interactionMode, setInteractionMode] = useState<'leftContour' | 'rightContour' | 'leftNipple' | 'rightNipple' | 'none'>('none');
   
   const { toast } = useToast();
 
@@ -211,6 +225,14 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
       description: "All breast measurements have been calculated from your annotations.",
     });
   }, [toast]);
+
+  const handleContourComplete = useCallback((contour: BreastContour) => {
+    console.log('Contour completed:', contour);
+  }, []);
+
+  const handleNipplePlaced = useCallback((nipple: NippleMarker) => {
+    console.log('Nipple placed:', nipple);
+  }, []);
 
   const handleSceneLoaded = useCallback((scene: THREE.Group) => {
     console.log('Scene loaded in ModelViewer:', scene);
@@ -347,6 +369,9 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                   modelUrl={modelUrl} 
                   isFullscreen={true}
                   onSceneLoaded={handleSceneLoaded}
+                  interactionMode={interactionMode}
+                  onContourComplete={handleContourComplete}
+                  onNipplePlaced={handleNipplePlaced}
                 />
               </Suspense>
             </Canvas>
@@ -357,6 +382,7 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
             <ManualBreastAnnotation
               scene={loadedScene}
               onMeasurementsComplete={handleMeasurementsComplete}
+              onModeChange={setInteractionMode}
             />
           )}
 

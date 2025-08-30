@@ -4,8 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { BreastContourTool } from './BreastContourTool';
-import { NipplePlacementTool } from './NipplePlacementTool';
 import { MeasurementInput } from './MeasurementInput';
 import { 
   ManualMeasurements, 
@@ -19,13 +17,15 @@ import { Circle, Target, Ruler, Eye, EyeOff } from 'lucide-react';
 interface ManualBreastAnnotationProps {
   scene: THREE.Group | null;
   onMeasurementsComplete: (measurements: CalculatedMeasurements) => void;
+  onModeChange: (mode: 'leftContour' | 'rightContour' | 'leftNipple' | 'rightNipple' | 'none') => void;
 }
 
 type AnnotationStep = 'leftContour' | 'rightContour' | 'leftNipple' | 'rightNipple' | 'distance' | 'complete';
 
 export const ManualBreastAnnotation = ({ 
   scene, 
-  onMeasurementsComplete 
+  onMeasurementsComplete,
+  onModeChange 
 }: ManualBreastAnnotationProps) => {
   const [currentStep, setCurrentStep] = useState<AnnotationStep>('leftContour');
   const [annotations, setAnnotations] = useState<ManualMeasurements>({
@@ -85,6 +85,19 @@ export const ManualBreastAnnotation = ({
     scene.add(newGroup);
     setVisualizationGroup(newGroup);
   }, [scene, annotations, showVisualization, visualizationGroup]);
+
+  // Update mode when step changes
+  useEffect(() => {
+    const modeMap: Record<AnnotationStep, 'leftContour' | 'rightContour' | 'leftNipple' | 'rightNipple' | 'none'> = {
+      leftContour: 'leftContour',
+      rightContour: 'rightContour', 
+      leftNipple: 'leftNipple',
+      rightNipple: 'rightNipple',
+      distance: 'none',
+      complete: 'none'
+    };
+    onModeChange(modeMap[currentStep]);
+  }, [currentStep, onModeChange]);
 
   // Update visualization when annotations change
   useEffect(() => {
@@ -188,32 +201,6 @@ export const ManualBreastAnnotation = ({
 
   return (
     <div className="absolute top-4 left-4 z-60 max-w-sm space-y-4">
-      {/* Tools */}
-      <BreastContourTool
-        isActive={currentStep === 'leftContour'}
-        breastSide="left"
-        onContourComplete={handleContourComplete}
-        existingContour={annotations.leftContour}
-      />
-      <BreastContourTool
-        isActive={currentStep === 'rightContour'}
-        breastSide="right"
-        onContourComplete={handleContourComplete}
-        existingContour={annotations.rightContour}
-      />
-      <NipplePlacementTool
-        isActive={currentStep === 'leftNipple'}
-        nippleSide="left"
-        onNipplePlaced={handleNipplePlaced}
-        existingNipple={annotations.leftNipple}
-      />
-      <NipplePlacementTool
-        isActive={currentStep === 'rightNipple'}
-        nippleSide="right"
-        onNipplePlaced={handleNipplePlaced}
-        existingNipple={annotations.rightNipple}
-      />
-
       {/* Instructions Panel */}
       <Card className="bg-background/95 backdrop-blur-sm">
         <CardHeader className="pb-3">
