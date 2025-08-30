@@ -170,21 +170,21 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
       leftBreastMesh: new THREE.Mesh(),
       rightBreastMesh: new THREE.Mesh(),
       landmarks: {
-        leftNipple: new THREE.Vector3(-0.3, 0.2, 0.8),  // Much closer to model
-        rightNipple: new THREE.Vector3(0.3, 0.2, 0.8),
-        leftInframammaryFold: new THREE.Vector3(-0.3, -0.1, 0.7),
-        rightInframammaryFold: new THREE.Vector3(0.3, -0.1, 0.7),
-        leftBreastApex: new THREE.Vector3(-0.3, 0.2, 0.9),
-        rightBreastApex: new THREE.Vector3(0.3, 0.2, 0.9),
-        midChestPoint: new THREE.Vector3(0, 0.2, 0.6),
+        leftNipple: new THREE.Vector3(-0.05, 0.02, 0.08),  // Very close to origin
+        rightNipple: new THREE.Vector3(0.05, 0.02, 0.08),
+        leftInframammaryFold: new THREE.Vector3(-0.05, -0.01, 0.07),
+        rightInframammaryFold: new THREE.Vector3(0.05, -0.01, 0.07),
+        leftBreastApex: new THREE.Vector3(-0.05, 0.02, 0.09),
+        rightBreastApex: new THREE.Vector3(0.05, 0.02, 0.09),
+        midChestPoint: new THREE.Vector3(0, 0.02, 0.06),
         chestWall: [
-          new THREE.Vector3(0, 0.2, 0.6),
-          new THREE.Vector3(-0.5, 0.2, 0.6),
-          new THREE.Vector3(0.5, 0.2, 0.6)
+          new THREE.Vector3(0, 0.02, 0.06),
+          new THREE.Vector3(-0.08, 0.02, 0.06),
+          new THREE.Vector3(0.08, 0.02, 0.06)
         ],
         breastBoundaries: {
-          left: [new THREE.Vector3(-0.3, 0.2, 0.8)],
-          right: [new THREE.Vector3(0.3, 0.2, 0.8)]
+          left: [new THREE.Vector3(-0.05, 0.02, 0.08)],
+          right: [new THREE.Vector3(0.05, 0.02, 0.08)]
         },
         measurements: {
           nippleToNippleDistance: 21,
