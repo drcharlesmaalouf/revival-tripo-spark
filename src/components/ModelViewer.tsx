@@ -345,7 +345,7 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
       {/* Normal viewer */}
       <div className={`relative h-full w-full overflow-hidden rounded-lg bg-gradient-secondary ${isFullscreen ? 'opacity-50' : ''}`}>
         <Canvas
-          key={`main-viewer-${modelUrl}`}
+          key="main-viewer"
           camera={{ 
             position: [3, 2, 3], 
             fov: 75,
