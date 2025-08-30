@@ -1,4 +1,4 @@
-import { Suspense, useRef, useImperativeHandle, forwardRef, useState, useEffect, useCallback } from "react";
+import { Suspense, useRef, useImperativeHandle, forwardRef, useState, useEffect, useCallback, memo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Environment, Box, useGLTF } from "@react-three/drei";
 import { Mesh } from "three";
@@ -29,7 +29,7 @@ const PlaceholderModel = () => {
   );
 };
 
-const GeneratedModel = ({ 
+const GeneratedModel = memo(({ 
   modelUrl, 
   onSceneLoaded 
 }: { 
@@ -37,6 +37,7 @@ const GeneratedModel = ({
   onSceneLoaded?: (scene: THREE.Group) => void;
 }) => {
   const groupRef = useRef<any>(null);
+  const hasNotifiedRef = useRef<boolean>(false);
 
   const shouldUseProxy = !modelUrl.startsWith('blob:') && !modelUrl.startsWith('data:');
   const finalUrl = shouldUseProxy 
@@ -47,10 +48,16 @@ const GeneratedModel = ({
 
   const gltfResult = useGLTF(finalUrl);
 
-  // Notify parent when scene is loaded
+  // Reset notification flag when URL changes
   useEffect(() => {
-    if (gltfResult?.scene && onSceneLoaded) {
+    hasNotifiedRef.current = false;
+  }, [modelUrl]);
+
+  // Notify parent when scene is loaded (only once per URL)
+  useEffect(() => {
+    if (gltfResult?.scene && onSceneLoaded && !hasNotifiedRef.current) {
       console.log('Scene loaded, notifying parent');
+      hasNotifiedRef.current = true;
       onSceneLoaded(gltfResult.scene);
     }
   }, [gltfResult?.scene, onSceneLoaded]);
@@ -79,7 +86,7 @@ const GeneratedModel = ({
       />
     </group>
   );
-};
+});
 
 // Component to display mesh analysis results
 const AnalyzedMesh = ({ 
