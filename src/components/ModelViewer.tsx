@@ -197,7 +197,7 @@ const Scene = forwardRef<any, {
         enablePan={true}
         enableZoom={true}
         enableRotate={true}
-        minDistance={0.01}
+        minDistance={0.005}
         maxDistance={100}
         autoRotate={false}
       />
@@ -343,7 +343,7 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
         <Canvas
           key={`main-viewer-${modelUrl}`}
           camera={{ 
-            position: [1, 0.5, 1], 
+            position: [0.3, 0.2, 0.3], 
             fov: 75,
             near: 0.001,
             far: 1000
