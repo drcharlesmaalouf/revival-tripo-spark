@@ -29,17 +29,8 @@ const PlaceholderModel = () => {
   );
 };
 
-const GeneratedModel = ({ 
-  modelUrl, 
-  onAnalysisComplete 
-}: { 
-  modelUrl: string;
-  onAnalysisComplete?: (data: BreastMeshData) => void;
-}) => {
+const GeneratedModel = ({ modelUrl }: { modelUrl: string }) => {
   const groupRef = useRef<any>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analyzedModelUrl, setAnalyzedModelUrl] = useState<string>('');
-  const { toast } = useToast();
 
   const shouldUseProxy = !modelUrl.startsWith('blob:') && !modelUrl.startsWith('data:');
   const finalUrl = shouldUseProxy 
@@ -49,35 +40,6 @@ const GeneratedModel = ({
   console.log('Loading model:', { original: modelUrl, final: finalUrl, useProxy: shouldUseProxy });
 
   const gltfResult = useGLTF(finalUrl);
-
-  // Perform anatomical analysis - STOP INFINITE LOOP
-  useEffect(() => {
-    if (!gltfResult?.scene || isAnalyzing || !onAnalysisComplete) return;
-    
-    // Only analyze if we haven't analyzed this exact URL yet
-    if (analyzedModelUrl === finalUrl) return;
-    
-    console.log('Starting anatomical analysis for model...');
-    setIsAnalyzing(true);
-    setAnalyzedModelUrl(finalUrl);
-    
-    anatomicalAnalyzer.analyzeModel(gltfResult.scene)
-      .then((analysisData) => {
-        console.log('Anatomical analysis complete:', analysisData);
-        onAnalysisComplete(analysisData);
-      })
-      .catch((error) => {
-        console.error('Anatomical analysis failed:', error);
-        toast({
-          variant: "destructive",
-          title: "Analysis Failed",
-          description: error.message || "Model does not appear suitable for anatomical analysis.",
-        });
-      })
-      .finally(() => {
-        setIsAnalyzing(false);
-      });
-  }, [gltfResult?.scene, finalUrl, onAnalysisComplete]); // MINIMAL dependencies
 
   if (!gltfResult?.scene) {
     console.log('No GLTF scene found - showing green cube fallback');
@@ -110,9 +72,8 @@ const Scene = forwardRef<any, {
   analysisData?: BreastMeshData | null;
   showMarkers?: boolean;
   showImplants?: boolean;
-  onAnalysisComplete?: (data: BreastMeshData) => void;
   isFullscreen?: boolean;
-}>(({ modelUrl, analysisData, showMarkers = false, showImplants = false, onAnalysisComplete, isFullscreen = false }, ref) => {
+}>(({ modelUrl, analysisData, showMarkers = false, showImplants = false, isFullscreen = false }, ref) => {
   const controlsRef = useRef<any>(null);
 
   useImperativeHandle(ref, () => ({
@@ -130,10 +91,7 @@ const Scene = forwardRef<any, {
       <directionalLight position={[-10, -10, -5]} intensity={0.5} />
 
       {modelUrl ? (
-        <GeneratedModel 
-          modelUrl={modelUrl} 
-          onAnalysisComplete={onAnalysisComplete}
-        />
+        <GeneratedModel modelUrl={modelUrl} />
       ) : (
         <PlaceholderModel />
       )}
@@ -202,12 +160,64 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
   const [userNippleDistance, setUserNippleDistance] = useState<number | undefined>(undefined);
   const { toast } = useToast();
 
-  const handleAnalysisComplete = (data: BreastMeshData) => {
-    console.log('Analysis complete callback received:', data);
-    setAnalysisData(data);
+  const runAnalysis = () => {
+    if (!modelUrl) return;
+    
+    console.log('Running manual analysis...');
+    
+    // Create mock analysis data for testing
+    const mockData: BreastMeshData = {
+      leftBreastMesh: new THREE.Mesh(),
+      rightBreastMesh: new THREE.Mesh(),
+      landmarks: {
+        leftNipple: new THREE.Vector3(-0.105, 0.15, 0.4),
+        rightNipple: new THREE.Vector3(0.105, 0.15, 0.4),
+        leftInframammaryFold: new THREE.Vector3(-0.105, 0.05, 0.35),
+        rightInframammaryFold: new THREE.Vector3(0.105, 0.05, 0.35),
+        leftBreastApex: new THREE.Vector3(-0.105, 0.15, 0.45),
+        rightBreastApex: new THREE.Vector3(0.105, 0.15, 0.45),
+        midChestPoint: new THREE.Vector3(0, 0.15, 0.3),
+        chestWall: [
+          new THREE.Vector3(0, 0.15, 0.3),
+          new THREE.Vector3(-0.2, 0.15, 0.3),
+          new THREE.Vector3(0.2, 0.15, 0.3)
+        ],
+        breastBoundaries: {
+          left: [new THREE.Vector3(-0.105, 0.15, 0.4)],
+          right: [new THREE.Vector3(0.105, 0.15, 0.4)]
+        },
+        measurements: {
+          nippleToNippleDistance: 21,
+          leftBreastWidth: 12,
+          rightBreastWidth: 12,
+          leftBreastHeight: 10,
+          rightBreastHeight: 10,
+          leftBreastProjection: 8,
+          rightBreastProjection: 8,
+          inframammaryFoldWidth: 15,
+          chestWallWidth: 90,
+          averageBreastSize: 'C' as const
+        }
+      },
+      measurements: {
+        nippleToNippleDistance: 21,
+        leftBreastWidth: 12,
+        rightBreastWidth: 12,
+        leftBreastHeight: 10,
+        rightBreastHeight: 10,
+        leftBreastProjection: 8,
+        rightBreastProjection: 8,
+        inframammaryFoldWidth: 15,
+        chestWallWidth: 90,
+        averageBreastSize: 'C' as const
+      },
+      modelScale: 10
+    };
+    
+    setAnalysisData(mockData);
     toast({
       title: "Analysis Complete",
-      description: "Anatomical landmarks detected and breast regions isolated.",
+      description: "Mock anatomical landmarks generated for testing.",
     });
   };
 
@@ -263,15 +273,14 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
           style={{ background: "transparent" }}
         >
           <Suspense fallback={null}>
-            <Scene 
-              ref={sceneRef} 
-              modelUrl={modelUrl} 
-              analysisData={analysisData}
-              showMarkers={false}
-              showImplants={false}
-              onAnalysisComplete={handleAnalysisComplete}
-              isFullscreen={false}
-            />
+              <Scene 
+                ref={sceneRef} 
+                modelUrl={modelUrl} 
+                analysisData={analysisData}
+                showMarkers={false}
+                showImplants={false}
+                isFullscreen={false}
+              />
           </Suspense>
         </Canvas>
 
@@ -356,7 +365,6 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                   analysisData={analysisData}
                   showMarkers={showMarkers}
                   showImplants={showImplants}
-                  onAnalysisComplete={handleAnalysisComplete}
                   isFullscreen={true}
                 />
               </Suspense>
@@ -378,6 +386,9 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                 variant={showMarkers ? "default" : "secondary"}
                 size="sm"
                 onClick={() => {
+                  if (!analysisData) {
+                    runAnalysis();
+                  }
                   console.log('EYE BUTTON CLICKED! showMarkers:', showMarkers, '-> ', !showMarkers);
                   setShowMarkers(!showMarkers);
                 }}
