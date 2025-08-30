@@ -171,6 +171,11 @@ const Scene = forwardRef<any, {
         <PlaceholderModel />
       )}
 
+      {/* Show color-coded mesh in fullscreen mode when available */}
+      {isFullscreen && analysisData?.analyzedMesh && (
+        <primitive object={analysisData.analyzedMesh} />
+      )}
+
       {/* Anatomical markers and implants overlay - only show in fullscreen */}
       {isFullscreen && analysisData && (
         <>
@@ -575,6 +580,31 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                       measurements={analysisData.measurements}
                       userNippleDistance={userNippleDistance}
                     />
+                    
+                    {/* Color legend for analysis visualization */}
+                    {analysisData.analyzedMesh && (
+                      <div className="bg-white/90 backdrop-blur-sm rounded-lg p-3 text-sm">
+                        <h4 className="font-semibold mb-2">Breast Detection Analysis</h4>
+                        <div className="space-y-1 text-xs">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                            <span>Nipples detected</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-pink-400 rounded-full"></div>
+                            <span>Left breast region</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-purple-400 rounded-full"></div>
+                            <span>Right breast region</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
+                            <span>Other areas</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

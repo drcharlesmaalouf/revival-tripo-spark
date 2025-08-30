@@ -1,10 +1,4 @@
-import { pipeline, env } from '@huggingface/transformers';
 import * as THREE from 'three';
-
-// Configure transformers.js
-env.allowLocalModels = false;
-env.useBrowserCache = false;
-
 import { BreastLandmarks, BreastMeasurements, BreastMeasurementAnalyzer } from './breastMeasurements';
 
 export interface AnatomicalLandmarks {
@@ -30,43 +24,22 @@ export interface BreastMeshData {
   landmarks: AnatomicalLandmarks;
   measurements: BreastMeasurements;
   modelScale: number;
+  analyzedMesh?: THREE.Mesh; // Mesh with color-coded analysis results
+}
+
+interface VertexAnalysis {
+  position: THREE.Vector3;
+  normal: THREE.Vector3;
+  curvature: number;
+  isBreastRegion: boolean;
+  isNippleCandidate: boolean;
+  breastSide?: 'left' | 'right';
 }
 
 class AnatomicalAnalyzer {
-  private segmentationPipeline: any = null;
-  private landmarkPipeline: any = null;
-
-  async initialize() {
-    console.log('Initializing anatomical analysis models...');
-    
-    try {
-      // Initialize segmentation model for breast region detection
-      this.segmentationPipeline = await pipeline(
-        'image-segmentation',
-        'Xenova/segformer-b0-finetuned-ade-512-512',
-        { device: 'webgpu' }
-      );
-
-      // Initialize landmark detection model
-      this.landmarkPipeline = await pipeline(
-        'object-detection',
-        'Xenova/detr-resnet-50',
-        { device: 'webgpu' }
-      );
-
-      console.log('Anatomical analysis models loaded successfully');
-    } catch (error) {
-      console.error('Error initializing models:', error);
-      throw error;
-    }
-  }
 
   async analyzeModel(scene: THREE.Group): Promise<BreastMeshData> {
-    if (!this.segmentationPipeline) {
-      await this.initialize();
-    }
-
-    console.log('Starting anatomical analysis...');
+    console.log('Starting real 3D mesh anatomical analysis...');
 
     // Basic validation - check if the model could be human
     const isValidHumanModel = await this.validateHumanModel(scene);
@@ -74,12 +47,20 @@ class AnatomicalAnalyzer {
       throw new Error('Model does not appear to be a human torso suitable for anatomical analysis');
     }
 
-    // Extract 2D renders from different angles for analysis
-    const frontView = await this.renderModelView(scene, 'front');
-    const sideView = await this.renderModelView(scene, 'side');
+    // Find the main mesh for analysis
+    const mainMesh = this.findMainMesh(scene);
+    if (!mainMesh) {
+      throw new Error('No analyzable mesh found in the scene');
+    }
 
-    // Analyze anatomical landmarks
-    const landmarks = await this.detectLandmarks(frontView, sideView, scene);
+    // Perform real 3D mesh analysis
+    const vertexAnalysis = this.analyzeMeshGeometry(mainMesh);
+    
+    // Detect landmarks based on actual geometry
+    const landmarks = this.detectAnatomicalLandmarks(vertexAnalysis, mainMesh);
+
+    // Create color-coded mesh for visualization
+    const analyzedMesh = this.createColorCodedMesh(mainMesh, vertexAnalysis);
 
     // Extract breast meshes
     const breastMeshes = await this.extractBreastMeshes(scene, landmarks);
@@ -106,7 +87,8 @@ class AnatomicalAnalyzer {
       rightBreastMesh: breastMeshes.right,
       landmarks: { ...landmarks, measurements },
       measurements,
-      modelScale
+      modelScale,
+      analyzedMesh
     };
   }
 
@@ -159,58 +141,302 @@ class AnatomicalAnalyzer {
     return hasValidAspectRatio && hasValidDepth && hasReasonableComplexity;
   }
 
-  private async renderModelView(scene: THREE.Group, viewType: 'front' | 'side'): Promise<string> {
-    // Create temporary renderer for analysis
-    const renderer = new THREE.WebGLRenderer({ preserveDrawingBuffer: true });
-    renderer.setSize(512, 512);
-    renderer.setClearColor(0x000000, 0);
+  private findMainMesh(scene: THREE.Group): THREE.Mesh | null {
+    let mainMesh: THREE.Mesh | null = null;
+    let maxVertices = 0;
 
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
-    
-    // Position camera based on view type
-    if (viewType === 'front') {
-      camera.position.set(0, 0, 5);
-    } else {
-      camera.position.set(5, 0, 0);
-    }
-    
-    camera.lookAt(0, 0, 0);
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.geometry) {
+        const positions = child.geometry.attributes.position;
+        if (positions && positions.count > maxVertices) {
+          maxVertices = positions.count;
+          mainMesh = child;
+        }
+      }
+    });
 
-    // Add lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(0, 1, 1);
-
-    const tempScene = new THREE.Scene();
-    tempScene.add(ambientLight);
-    tempScene.add(directionalLight);
-    tempScene.add(scene.clone());
-
-    renderer.render(tempScene, camera);
-
-    // Convert to base64
-    const canvas = renderer.domElement;
-    const dataURL = canvas.toDataURL('image/png');
-    
-    // Cleanup
-    renderer.dispose();
-    
-    return dataURL;
+    console.log(`Found main mesh with ${maxVertices} vertices`);
+    return mainMesh;
   }
 
-  private async detectLandmarks(frontView: string, sideView: string, scene: THREE.Group): Promise<AnatomicalLandmarks> {
-    console.log('Detecting breast-specific anatomical landmarks...');
+  private analyzeMeshGeometry(mesh: THREE.Mesh): VertexAnalysis[] {
+    console.log('Analyzing mesh geometry for breast features...');
+    
+    const geometry = mesh.geometry;
+    const positions = geometry.attributes.position;
+    const normals = geometry.attributes.normal;
+    
+    if (!positions || !normals) {
+      throw new Error('Mesh missing required position or normal attributes');
+    }
 
-    // For enhanced breast analysis, we need more precise detection
-    const boundingBox = new THREE.Box3().setFromObject(scene);
+    const vertexAnalysis: VertexAnalysis[] = [];
+    const vertexCount = positions.count;
+    
+    // Get bounding box for reference
+    geometry.computeBoundingBox();
+    const boundingBox = geometry.boundingBox!;
+    const center = boundingBox.getCenter(new THREE.Vector3());
+    const size = boundingBox.getSize(new THREE.Vector3());
+
+    console.log(`Analyzing ${vertexCount} vertices...`);
+    console.log('Model center:', center);
+    console.log('Model size:', size);
+
+    for (let i = 0; i < vertexCount; i++) {
+      const position = new THREE.Vector3(
+        positions.getX(i),
+        positions.getY(i),
+        positions.getZ(i)
+      );
+      
+      const normal = new THREE.Vector3(
+        normals.getX(i),
+        normals.getY(i),
+        normals.getZ(i)
+      );
+
+      // Calculate curvature based on normal direction and position
+      const curvature = this.calculateVertexCurvature(position, normal, i, positions, normals);
+      
+      // Determine if this vertex is in breast region
+      const isBreastRegion = this.isInBreastRegion(position, center, size);
+      
+      // Check if this could be a nipple (high curvature + forward position + breast region)
+      const isNippleCandidate = isBreastRegion && curvature > 0.8 && 
+        position.z > center.z + size.z * 0.2; // Forward-most 20%
+      
+      // Determine breast side
+      let breastSide: 'left' | 'right' | undefined;
+      if (isBreastRegion) {
+        breastSide = position.x < center.x ? 'left' : 'right';
+      }
+
+      vertexAnalysis.push({
+        position: position.clone(),
+        normal: normal.clone(),
+        curvature,
+        isBreastRegion,
+        isNippleCandidate,
+        breastSide
+      });
+    }
+
+    const breastVertices = vertexAnalysis.filter(v => v.isBreastRegion).length;
+    const nippleCandidates = vertexAnalysis.filter(v => v.isNippleCandidate).length;
+    
+    console.log(`Found ${breastVertices} breast region vertices`);
+    console.log(`Found ${nippleCandidates} nipple candidates`);
+
+    return vertexAnalysis;
+  }
+
+  private calculateVertexCurvature(
+    position: THREE.Vector3,
+    normal: THREE.Vector3,
+    index: number,
+    positions: THREE.BufferAttribute | THREE.InterleavedBufferAttribute,
+    normals: THREE.BufferAttribute | THREE.InterleavedBufferAttribute
+  ): number {
+    // Simplified curvature calculation based on normal vector direction
+    // Higher values indicate more pronounced curvature
+    
+    // Forward-facing normal indicates convex curvature (breast/nipple)
+    const forwardFacing = normal.z > 0 ? normal.z : 0;
+    
+    // Additional curvature from how much the normal deviates from surrounding normals
+    let normalDeviation = 0;
+    const sampleRadius = 10; // Check nearby vertices
+    let sampledCount = 0;
+    
+    for (let i = Math.max(0, index - sampleRadius); 
+         i < Math.min(positions.count, index + sampleRadius); 
+         i++) {
+      if (i === index) continue;
+      
+      const nearbyNormal = new THREE.Vector3(
+        normals.getX(i),
+        normals.getY(i),
+        normals.getZ(i)
+      );
+      
+      normalDeviation += normal.angleTo(nearbyNormal);
+      sampledCount++;
+    }
+    
+    if (sampledCount > 0) {
+      normalDeviation /= sampledCount;
+    }
+    
+    // Combine forward-facing and deviation for curvature measure
+    return forwardFacing * 0.7 + (normalDeviation / Math.PI) * 0.3;
+  }
+
+  private isInBreastRegion(position: THREE.Vector3, center: THREE.Vector3, size: THREE.Vector3): boolean {
+    // Define breast region based on anatomical positioning
+    const relativePos = position.clone().sub(center);
+    
+    // Breast region criteria:
+    // 1. Forward portion of torso (positive Z)
+    // 2. Upper chest area (positive Y, but not too high)
+    // 3. Left and right sides (not center)
+    // 4. Reasonable distance from center
+    
+    const isForward = relativePos.z > size.z * 0.1; // Forward 10% of model
+    const isUpperChest = relativePos.y > -size.y * 0.3 && relativePos.y < size.y * 0.3;
+    const isNotCenter = Math.abs(relativePos.x) > size.x * 0.05; // Not in center 10%
+    const isReasonableDistance = Math.abs(relativePos.x) < size.x * 0.4; // Within 40% of center
+    
+    return isForward && isUpperChest && isNotCenter && isReasonableDistance;
+  }
+
+  private detectAnatomicalLandmarks(vertexAnalysis: VertexAnalysis[], mesh: THREE.Mesh): AnatomicalLandmarks {
+    console.log('Detecting anatomical landmarks from mesh analysis...');
+    
+    const breastVertices = vertexAnalysis.filter(v => v.isBreastRegion);
+    const leftBreastVertices = breastVertices.filter(v => v.breastSide === 'left');
+    const rightBreastVertices = breastVertices.filter(v => v.breastSide === 'right');
+    
+    // Find nipples as highest curvature points in each breast
+    const leftNippleCandidates = leftBreastVertices
+      .filter(v => v.isNippleCandidate)
+      .sort((a, b) => b.curvature - a.curvature);
+    
+    const rightNippleCandidates = rightBreastVertices
+      .filter(v => v.isNippleCandidate)
+      .sort((a, b) => b.curvature - a.curvature);
+    
+    // Get bounding box for reference
+    const boundingBox = new THREE.Box3().setFromObject(mesh);
     const center = boundingBox.getCenter(new THREE.Vector3());
     const size = boundingBox.getSize(new THREE.Vector3());
     
-    // Use more sophisticated breast anatomy detection
-    const landmarks = this.detectBreastAnatomy(boundingBox, scene);
+    // Use detected nipples or fallback to geometric estimation
+    const leftNipple = leftNippleCandidates.length > 0 
+      ? leftNippleCandidates[0].position
+      : this.detectNipplePosition(center, size, 'left');
     
-    console.log('Breast landmarks detected:', landmarks);
+    const rightNipple = rightNippleCandidates.length > 0 
+      ? rightNippleCandidates[0].position
+      : this.detectNipplePosition(center, size, 'right');
+    
+    console.log('Detected nipples:', { 
+      left: leftNipple, 
+      right: rightNipple,
+      leftCandidates: leftNippleCandidates.length,
+      rightCandidates: rightNippleCandidates.length
+    });
+    
+    // Generate breast boundaries from actual detected breast vertices
+    const leftBoundary = this.generateBreastBoundaryFromVertices(leftBreastVertices);
+    const rightBoundary = this.generateBreastBoundaryFromVertices(rightBreastVertices);
+    
+    const landmarks: AnatomicalLandmarks = {
+      leftNipple,
+      rightNipple,
+      leftInframammaryFold: this.detectInframammaryFold(center, size, 'left'),
+      rightInframammaryFold: this.detectInframammaryFold(center, size, 'right'),
+      leftBreastApex: this.findBreastApex(leftBreastVertices),
+      rightBreastApex: this.findBreastApex(rightBreastVertices),
+      midChestPoint: new THREE.Vector3(center.x, center.y, center.z - size.z * 0.2),
+      chestWall: [
+        new THREE.Vector3(center.x, center.y, center.z - size.z * 0.2),
+        new THREE.Vector3(center.x - size.x * 0.3, center.y, center.z - size.z * 0.2),
+        new THREE.Vector3(center.x + size.x * 0.3, center.y, center.z - size.z * 0.2)
+      ],
+      breastBoundaries: {
+        left: leftBoundary,
+        right: rightBoundary
+      },
+      measurements: {} as BreastMeasurements
+    };
+    
     return landmarks;
+  }
+
+  private generateBreastBoundaryFromVertices(breastVertices: VertexAnalysis[]): THREE.Vector3[] {
+    if (breastVertices.length === 0) return [];
+    
+    // Find the convex hull or boundary points of breast vertices
+    const positions = breastVertices.map(v => v.position);
+    
+    // Sort by angle around the centroid to create a boundary
+    const centroid = positions.reduce((sum, pos) => sum.add(pos), new THREE.Vector3()).divideScalar(positions.length);
+    
+    const sortedPositions = positions.sort((a, b) => {
+      const angleA = Math.atan2(a.y - centroid.y, a.x - centroid.x);
+      const angleB = Math.atan2(b.y - centroid.y, b.x - centroid.x);
+      return angleA - angleB;
+    });
+    
+    // Sample boundary points
+    const boundaryPoints = [];
+    const step = Math.max(1, Math.floor(sortedPositions.length / 16)); // Sample ~16 points
+    
+    for (let i = 0; i < sortedPositions.length; i += step) {
+      boundaryPoints.push(sortedPositions[i]);
+    }
+    
+    return boundaryPoints;
+  }
+
+  private findBreastApex(breastVertices: VertexAnalysis[]): THREE.Vector3 {
+    if (breastVertices.length === 0) {
+      return new THREE.Vector3(0, 0, 0);
+    }
+    
+    // Find the most forward-projecting point (highest Z value)
+    const apexVertex = breastVertices.reduce((max, vertex) => 
+      vertex.position.z > max.position.z ? vertex : max
+    );
+    
+    return apexVertex.position;
+  }
+
+  private createColorCodedMesh(originalMesh: THREE.Mesh, vertexAnalysis: VertexAnalysis[]): THREE.Mesh {
+    console.log('Creating color-coded mesh for visualization...');
+    
+    const geometry = originalMesh.geometry.clone();
+    const vertexCount = geometry.attributes.position.count;
+    
+    // Create color attribute for vertices
+    const colors = new Float32Array(vertexCount * 3);
+    
+    for (let i = 0; i < vertexCount; i++) {
+      const analysis = vertexAnalysis[i];
+      let r = 0.7, g = 0.7, b = 0.7; // Default gray
+      
+      if (analysis.isNippleCandidate) {
+        // Nipples in bright red
+        r = 1.0; g = 0.0; b = 0.0;
+      } else if (analysis.isBreastRegion) {
+        // Breast regions in pink/salmon
+        if (analysis.breastSide === 'left') {
+          r = 1.0; g = 0.6; b = 0.8; // Light pink for left
+        } else {
+          r = 0.8; g = 0.6; b = 1.0; // Light purple for right
+        }
+      }
+      
+      colors[i * 3] = r;
+      colors[i * 3 + 1] = g;
+      colors[i * 3 + 2] = b;
+    }
+    
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    
+    // Create material that uses vertex colors
+    const material = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      side: THREE.DoubleSide
+    });
+    
+    const colorCodedMesh = new THREE.Mesh(geometry, material);
+    colorCodedMesh.position.copy(originalMesh.position);
+    colorCodedMesh.rotation.copy(originalMesh.rotation);
+    colorCodedMesh.scale.copy(originalMesh.scale);
+    
+    return colorCodedMesh;
   }
 
   private detectBreastAnatomy(boundingBox: THREE.Box3, scene: THREE.Group): AnatomicalLandmarks {
