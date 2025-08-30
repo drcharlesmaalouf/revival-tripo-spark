@@ -2,9 +2,13 @@ import { Suspense, useRef, useImperativeHandle, forwardRef, useState, useEffect 
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Environment, Box, useGLTF } from "@react-three/drei";
 import { Mesh } from "three";
-import { Download, RotateCcw, Maximize2, X, Move } from "lucide-react";
+import { Download, RotateCcw, Maximize2, X, Move, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { anatomicalAnalyzer, AnatomicalLandmarks, BreastMeshData } from "@/lib/anatomicalAnalysis";
+import { AnatomicalMarkers } from "./AnatomicalMarkers";
+import { ImplantMesh } from "./ImplantMesh";
+import * as THREE from "three";
 
 interface ModelViewerProps {
   modelUrl?: string;
@@ -33,9 +37,16 @@ const PlaceholderModel = () => {
   );
 };
 
-// Generated 3D model component that loads the actual model
-const GeneratedModel = ({ modelUrl }: { modelUrl: string }) => {
+// Enhanced Generated 3D model component with anatomical analysis
+const GeneratedModel = ({ 
+  modelUrl, 
+  onAnalysisComplete 
+}: { 
+  modelUrl: string;
+  onAnalysisComplete?: (data: BreastMeshData) => void;
+}) => {
   const groupRef = useRef<any>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // Check if it's a blob URL - use directly, otherwise use proxy
   const shouldUseProxy = !modelUrl.startsWith('blob:') && !modelUrl.startsWith('data:');
@@ -47,6 +58,24 @@ const GeneratedModel = ({ modelUrl }: { modelUrl: string }) => {
 
   // Use useGLTF hook properly - it handles loading states internally
   const gltfResult = useGLTF(finalUrl);
+
+  // Perform anatomical analysis when model loads
+  useEffect(() => {
+    if (gltfResult?.scene && !isAnalyzing && onAnalysisComplete) {
+      setIsAnalyzing(true);
+      anatomicalAnalyzer.analyzeModel(gltfResult.scene)
+        .then((analysisData) => {
+          console.log('Anatomical analysis complete:', analysisData);
+          onAnalysisComplete(analysisData);
+        })
+        .catch((error) => {
+          console.error('Anatomical analysis failed:', error);
+        })
+        .finally(() => {
+          setIsAnalyzing(false);
+        });
+    }
+  }, [gltfResult?.scene, isAnalyzing, onAnalysisComplete]);
 
   // Check if the model has loaded successfully
   if (!gltfResult?.scene) {
@@ -71,11 +100,23 @@ const GeneratedModel = ({ modelUrl }: { modelUrl: string }) => {
         scale={[1, 1, 1]}
         position={[0, 0, 0]}
       />
+      {isAnalyzing && (
+        <mesh position={[0, 2, 0]}>
+          <boxGeometry args={[0.1, 0.1, 0.1]} />
+          <meshBasicMaterial color="#ffff00" />
+        </mesh>
+      )}
     </group>
   );
 };
 
-const Scene = forwardRef<any, { modelUrl?: string }>(({ modelUrl }, ref) => {
+const Scene = forwardRef<any, { 
+  modelUrl?: string; 
+  analysisData?: BreastMeshData | null;
+  showMarkers?: boolean;
+  showImplants?: boolean;
+  onAnalysisComplete?: (data: BreastMeshData) => void;
+}>(({ modelUrl, analysisData, showMarkers = false, showImplants = false, onAnalysisComplete }, ref) => {
   const controlsRef = useRef<any>(null);
 
   useImperativeHandle(ref, () => ({
@@ -93,9 +134,39 @@ const Scene = forwardRef<any, { modelUrl?: string }>(({ modelUrl }, ref) => {
       <directionalLight position={[-10, -10, -5]} intensity={0.5} />
 
       {modelUrl ? (
-        <GeneratedModel modelUrl={modelUrl} />
+        <GeneratedModel 
+          modelUrl={modelUrl} 
+          onAnalysisComplete={onAnalysisComplete}
+        />
       ) : (
         <PlaceholderModel />
+      )}
+
+      {/* Anatomical markers and implants overlay */}
+      {analysisData && (
+        <>
+          {showMarkers && (
+            <AnatomicalMarkers 
+              landmarks={analysisData.landmarks} 
+              showMarkers={true} 
+            />
+          )}
+          
+          {showImplants && (
+            <>
+              <ImplantMesh 
+                position={anatomicalAnalyzer.getImplantPosition(analysisData.landmarks, 'left')}
+                side="left"
+                visible={true}
+              />
+              <ImplantMesh 
+                position={anatomicalAnalyzer.getImplantPosition(analysisData.landmarks, 'right')}
+                side="right"
+                visible={true}
+              />
+            </>
+          )}
+        </>
       )}
 
       <Environment preset="city" />
@@ -121,6 +192,20 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const windowRef = useRef<HTMLDivElement>(null);
+  
+  // Anatomical analysis state
+  const [analysisData, setAnalysisData] = useState<BreastMeshData | null>(null);
+  const [showMarkers, setShowMarkers] = useState(false);
+  const [showImplants, setShowImplants] = useState(false);
+  const { toast } = useToast();
+
+  const handleAnalysisComplete = (data: BreastMeshData) => {
+    setAnalysisData(data);
+    toast({
+      title: "Analysis Complete",
+      description: "Anatomical landmarks detected and breast regions isolated.",
+    });
+  };
 
   const handleDownload = () => {
     if (modelUrl) {
@@ -228,7 +313,14 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
           style={{ background: "transparent" }}
         >
           <Suspense fallback={null}>
-            <Scene ref={sceneRef} modelUrl={modelUrl} />
+            <Scene 
+              ref={sceneRef} 
+              modelUrl={modelUrl} 
+              analysisData={analysisData}
+              showMarkers={showMarkers}
+              showImplants={showImplants}
+              onAnalysisComplete={handleAnalysisComplete}
+            />
           </Suspense>
         </Canvas>
 
@@ -251,6 +343,31 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
           >
             <Maximize2 className="w-4 h-4" />
           </Button>
+
+          {/* Anatomical Analysis Controls */}
+          {analysisData && (
+            <>
+              <Button
+                variant={showMarkers ? "default" : "secondary"}
+                size="sm"
+                onClick={() => setShowMarkers(!showMarkers)}
+                className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
+                title="Toggle anatomical landmarks"
+              >
+                {showMarkers ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              </Button>
+
+              <Button
+                variant={showImplants ? "default" : "secondary"}
+                size="sm"
+                onClick={() => setShowImplants(!showImplants)}
+                className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
+                title="Toggle implant preview"
+              >
+                <span className="w-4 h-4 text-xs font-bold">300</span>
+              </Button>
+            </>
+          )}
 
           {modelUrl && (
             <Button
@@ -331,7 +448,14 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
                 style={{ background: "transparent" }}
               >
                 <Suspense fallback={null}>
-                  <Scene ref={sceneRef} modelUrl={modelUrl} />
+                  <Scene 
+                    ref={sceneRef} 
+                    modelUrl={modelUrl} 
+                    analysisData={analysisData}
+                    showMarkers={showMarkers}
+                    showImplants={showImplants}
+                    onAnalysisComplete={handleAnalysisComplete}
+                  />
                 </Suspense>
               </Canvas>
 
