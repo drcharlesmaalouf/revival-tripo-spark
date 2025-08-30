@@ -193,6 +193,7 @@ const Scene = forwardRef<any, {
         minDistance={0.005}
         maxDistance={100}
         autoRotate={false}
+        enabled={drawingMode === 'none'}
       />
     </>
   );
