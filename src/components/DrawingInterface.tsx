@@ -261,7 +261,8 @@ export const DrawingInterface = ({
             {currentMode === 'rightContour' && 'Draw around the right breast contour'}
             {currentMode === 'leftNipple' && 'Click on the left nipple'}
             {currentMode === 'rightNipple' && 'Click on the right nipple'}
-            {currentMode === 'none' && 'Select a tool to start annotating'}
+            {currentMode === 'none' && isComplete && 'All annotations complete! Enter distance below.'}
+            {currentMode === 'none' && !isComplete && 'Select a tool to start annotating'}
           </div>
 
           <Separator />
@@ -309,6 +310,7 @@ export const DrawingInterface = ({
           {/* Progress */}
           <div className="text-xs text-muted-foreground">
             Progress: {Object.values(annotations).filter(Boolean).length}/4 complete
+            {isComplete && ' - Ready for simulation!'}
           </div>
         </CardContent>
       </Card>

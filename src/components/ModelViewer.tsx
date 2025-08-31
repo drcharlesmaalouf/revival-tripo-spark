@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { DrawingInterface } from "./DrawingInterface";
 import { DrawingTool } from "./DrawingTool";
-import { BreastSimulator } from "./BreastSimulator";
+import { BreastManipulator } from "./BreastManipulator";
 import { CalculatedMeasurements, BreastContour, NippleMarker } from "@/lib/manualMeasurements";
 import * as THREE from "three";
 
@@ -311,7 +311,7 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
             />
           </Suspense>
         </Canvas>
-
+          {/* Breast Manipulator - show when measurements and annotations are complete */}
         {/* Normal viewer controls */}
         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2">
           <Button
@@ -412,7 +412,7 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
 
            {/* Breast Simulator - show when measurements and annotations are complete */}
            {isFullscreen && calculatedMeasurements && breastAnnotations && loadedScene && (
-             <BreastSimulator
+            <BreastManipulator
                scene={loadedScene}
                measurements={calculatedMeasurements}
                leftContour={breastAnnotations.leftContour}
