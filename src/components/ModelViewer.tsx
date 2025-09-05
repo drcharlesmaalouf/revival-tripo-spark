@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { DrawingInterface } from "./DrawingInterface";
 import { DrawingTool } from "./DrawingTool";
 import { BreastManipulator } from "./BreastManipulator";
-import { PhysicsBreastSimulator } from "./PhysicsBreastSimulator";
+import { SimplePhysicsPanel } from "./SimplePhysicsPanel";
 import { CalculatedMeasurements, BreastContour, NippleMarker } from "@/lib/manualMeasurements";
 import * as THREE from "three";
 
@@ -411,17 +411,16 @@ export const ModelViewer = ({ modelUrl }: ModelViewerProps) => {
              />
            )}
 
-            {/* Physics Breast Simulator - show when measurements and annotations are complete */}
-            {isFullscreen && calculatedMeasurements && breastAnnotations && loadedScene && (
-             <PhysicsBreastSimulator
-                scene={loadedScene}
-                measurements={calculatedMeasurements}
-                leftContour={breastAnnotations.leftContour}
-                rightContour={breastAnnotations.rightContour}
-                leftNipple={breastAnnotations.leftNipple}
-                rightNipple={breastAnnotations.rightNipple}
-              />
-            )}
+             {/* Simple Physics Panel - show when measurements and annotations are complete */}
+             {isFullscreen && calculatedMeasurements && breastAnnotations && (
+              <SimplePhysicsPanel
+                 measurements={calculatedMeasurements}
+                 leftContour={breastAnnotations.leftContour}
+                 rightContour={breastAnnotations.rightContour}
+                 leftNipple={breastAnnotations.leftNipple}
+                 rightNipple={breastAnnotations.rightNipple}
+               />
+             )}
 
           {/* CONTROL BUTTONS - ALWAYS VISIBLE */}
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-60">
