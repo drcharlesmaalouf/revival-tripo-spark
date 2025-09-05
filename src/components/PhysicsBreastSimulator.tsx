@@ -122,11 +122,15 @@ export const PhysicsBreastSimulator: React.FC<PhysicsBreastSimulatorProps> = ({
   // Initialize physics engine
   useEffect(() => {
     console.log('Attempting to initialize physics engine...');
+    console.log('Dependencies:', { leftContour, rightContour, leftNipple, rightNipple });
+    
     if (!engineRef.current) {
       try {
+        console.log('Creating BreastPhysicsEngine...');
         engineRef.current = new BreastPhysicsEngine();
         console.log('Physics engine initialized successfully');
         
+        console.log('Creating soft bodies...');
         // Create soft bodies for breasts
         const leftBreast = engineRef.current.createBreastSoftBody(
           leftContour,
@@ -134,6 +138,7 @@ export const PhysicsBreastSimulator: React.FC<PhysicsBreastSimulatorProps> = ({
           'left',
           leftParams
         );
+        console.log('Left breast created:', leftBreast);
         
         const rightBreast = engineRef.current.createBreastSoftBody(
           rightContour,
@@ -141,24 +146,31 @@ export const PhysicsBreastSimulator: React.FC<PhysicsBreastSimulatorProps> = ({
           'right',
           rightParams
         );
+        console.log('Right breast created:', rightBreast);
         
         // Add implants
         const leftImplantPos = leftNipple.position.clone();
         leftImplantPos.z -= 0.03;
         engineRef.current.addImplant(leftImplantPos, 'left', leftParams);
+        console.log('Left implant added');
         
         const rightImplantPos = rightNipple.position.clone();
         rightImplantPos.z -= 0.03;
         engineRef.current.addImplant(rightImplantPos, 'right', rightParams);
+        console.log('Right implant added');
         
         setSimulationState(prev => ({
           ...prev,
           leftVolume: leftBreast.state.originalVolume,
           rightVolume: rightBreast.state.originalVolume
         }));
+        console.log('Simulation state updated');
       } catch (error) {
         console.error('Failed to initialize physics engine:', error);
+        console.error('Error stack:', error.stack);
       }
+    } else {
+      console.log('Physics engine already exists');
     }
     
     return () => {
@@ -250,7 +262,7 @@ export const PhysicsBreastSimulator: React.FC<PhysicsBreastSimulatorProps> = ({
   };
 
   return (
-    <div className="absolute top-16 left-4 z-50 w-80 space-y-4">
+    <div className="absolute top-16 left-4 z-50 w-80 space-y-4" style={{ backgroundColor: 'rgba(255, 0, 0, 0.1)', border: '2px solid red' }}>
       {/* Simulation Controls */}
       <Card className="bg-background/95 backdrop-blur-sm">
         <CardHeader className="pb-3">
