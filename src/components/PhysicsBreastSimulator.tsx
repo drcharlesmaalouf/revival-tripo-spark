@@ -79,6 +79,15 @@ export const PhysicsBreastSimulator: React.FC<PhysicsBreastSimulatorProps> = ({
   const engineRef = useRef<BreastPhysicsEngine | null>(null);
   const { toast } = useToast();
   
+  console.log('PhysicsBreastSimulator rendered with:', {
+    scene,
+    measurements,
+    leftContour,
+    rightContour,
+    leftNipple,
+    rightNipple
+  });
+  
   // Simulation state
   const [simulationState, setSimulationState] = useState<SimulationState>({
     isRunning: false,
@@ -112,38 +121,44 @@ export const PhysicsBreastSimulator: React.FC<PhysicsBreastSimulatorProps> = ({
   
   // Initialize physics engine
   useEffect(() => {
+    console.log('Attempting to initialize physics engine...');
     if (!engineRef.current) {
-      engineRef.current = new BreastPhysicsEngine();
-      
-      // Create soft bodies for breasts
-      const leftBreast = engineRef.current.createBreastSoftBody(
-        leftContour,
-        leftNipple,
-        'left',
-        leftParams
-      );
-      
-      const rightBreast = engineRef.current.createBreastSoftBody(
-        rightContour,
-        rightNipple,
-        'right',
-        rightParams
-      );
-      
-      // Add implants
-      const leftImplantPos = leftNipple.position.clone();
-      leftImplantPos.z -= 0.03;
-      engineRef.current.addImplant(leftImplantPos, 'left', leftParams);
-      
-      const rightImplantPos = rightNipple.position.clone();
-      rightImplantPos.z -= 0.03;
-      engineRef.current.addImplant(rightImplantPos, 'right', rightParams);
-      
-      setSimulationState(prev => ({
-        ...prev,
-        leftVolume: leftBreast.state.originalVolume,
-        rightVolume: rightBreast.state.originalVolume
-      }));
+      try {
+        engineRef.current = new BreastPhysicsEngine();
+        console.log('Physics engine initialized successfully');
+        
+        // Create soft bodies for breasts
+        const leftBreast = engineRef.current.createBreastSoftBody(
+          leftContour,
+          leftNipple,
+          'left',
+          leftParams
+        );
+        
+        const rightBreast = engineRef.current.createBreastSoftBody(
+          rightContour,
+          rightNipple,
+          'right',
+          rightParams
+        );
+        
+        // Add implants
+        const leftImplantPos = leftNipple.position.clone();
+        leftImplantPos.z -= 0.03;
+        engineRef.current.addImplant(leftImplantPos, 'left', leftParams);
+        
+        const rightImplantPos = rightNipple.position.clone();
+        rightImplantPos.z -= 0.03;
+        engineRef.current.addImplant(rightImplantPos, 'right', rightParams);
+        
+        setSimulationState(prev => ({
+          ...prev,
+          leftVolume: leftBreast.state.originalVolume,
+          rightVolume: rightBreast.state.originalVolume
+        }));
+      } catch (error) {
+        console.error('Failed to initialize physics engine:', error);
+      }
     }
     
     return () => {
