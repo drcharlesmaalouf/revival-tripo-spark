@@ -122,9 +122,8 @@ export const PhysicsBreastSimulator: React.FC<PhysicsBreastSimulatorProps> = ({
   // Initialize physics engine
   useEffect(() => {
     console.log('Attempting to initialize physics engine...');
-    console.log('Dependencies:', { leftContour, rightContour, leftNipple, rightNipple });
     
-    if (!engineRef.current) {
+    if (!engineRef.current && leftContour && rightContour && leftNipple && rightNipple) {
       try {
         console.log('Creating BreastPhysicsEngine...');
         engineRef.current = new BreastPhysicsEngine();
@@ -170,7 +169,7 @@ export const PhysicsBreastSimulator: React.FC<PhysicsBreastSimulatorProps> = ({
         console.error('Error stack:', error.stack);
       }
     } else {
-      console.log('Physics engine already exists');
+      console.log('Physics engine already exists or missing dependencies');
     }
     
     return () => {
@@ -179,7 +178,7 @@ export const PhysicsBreastSimulator: React.FC<PhysicsBreastSimulatorProps> = ({
         engineRef.current = null;
       }
     };
-  }, [leftContour, rightContour, leftNipple, rightNipple]);
+  }, []); // Empty dependency array to prevent infinite loops
   
   const handleStartSimulation = useCallback(() => {
     if (!engineRef.current) return;
